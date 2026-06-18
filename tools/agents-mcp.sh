@@ -2,13 +2,14 @@
 #
 # agents-mcp.sh — Manage the project's MCP server config in the current directory.
 #
-# JSON is the single source of truth; the TOML is derived from it at runtime.
+# JSON is the single source of truth; the other formats are derived from it at runtime.
 #   - .mcp.json          (JSON,  Claude Code)
-#   - .codex/config.toml (TOML,  Codex — converted from the JSON via jq)
+#   - .codex/config.toml (TOML,  Codex    — converted from the JSON via jq)
+#   - opencode.json      (JSON,  opencode — converted from the JSON via jq)
 #
 # Behavior:
-#   - `add` writes both files into the current working directory.
-#   - `rm`  removes both files (and the .codex directory if left empty).
+#   - `add` writes all files into the current working directory.
+#   - `rm`  removes all files (and the .codex directory if left empty).
 #   - Exit codes:
 #       0    success
 #       1    bad usage, missing dependency, or `rm` when no file exists
@@ -17,6 +18,7 @@ set -euo pipefail
 
 readonly JSON_FILE=".mcp.json"
 readonly TOML_FILE=".codex/config.toml"
+readonly OPENCODE_FILE="opencode.json"
 
 readonly JSON_CONFIG='{
   "mcpServers": {
@@ -34,7 +36,7 @@ readonly JSON_CONFIG='{
         "--access-mode=restricted"
       ],
       "env": {
-        "DATABASE_URI": "postgres://human_ro@0.0.0.0:5433/alarm-processor"
+        "DATABASE_URI": "postgres://human_ro@0.0.0.0:5433/database"
       }
     }
   }
@@ -53,14 +55,28 @@ readonly JQ_TO_TOML='
   (.value.env | to_entries[] | "\(.key) = \"\(.value)\"")
 ] | join("\n")'
 
+# jq program converting the MCP JSON into opencode JSON: renames mcpServers ->
+# mcp, marks each server local, merges command+args into a single command
+# array, and renames env -> environment.
+readonly JQ_TO_OPENCODE='{
+  mcp: (.mcpServers | to_entries | map({
+    key: .key,
+    value: {
+      type: "local",
+      command: ([.value.command] + .value.args),
+      environment: .value.env
+    }
+  }) | from_entries)
+}'
+
 usage() {
   cat <<'EOF'
 Usage:
   agents-mcp.sh <add|rm>
 
 Commands:
-  add  Write .mcp.json and .codex/config.toml to the current directory.
-  rm   Remove .mcp.json and .codex/config.toml from the current directory.
+  add  Write .mcp.json, .codex/config.toml and opencode.json to the current directory.
+  rm   Remove .mcp.json, .codex/config.toml and opencode.json from the current directory.
 EOF
 }
 
@@ -71,6 +87,10 @@ die() {
 
 json_to_toml() {
   jq -r "$JQ_TO_TOML" <<<"$JSON_CONFIG"
+}
+
+json_to_opencode() {
+  jq "$JQ_TO_OPENCODE" <<<"$JSON_CONFIG"
 }
 
 write_file() {
@@ -92,12 +112,14 @@ add_config() {
   local base="$(pwd)"
   write_file "$base/$JSON_FILE" "$JSON_CONFIG"
   write_file "$base/$TOML_FILE" "$(json_to_toml)"
+  write_file "$base/$OPENCODE_FILE" "$(json_to_opencode)"
 }
 
 rm_config() {
   local base="$(pwd)"
   remove_file "$base/$JSON_FILE"
   remove_file "$base/$TOML_FILE"
+  remove_file "$base/$OPENCODE_FILE"
   rmdir "$base/$(dirname "$TOML_FILE")" 2>/dev/null || true
 }
 
