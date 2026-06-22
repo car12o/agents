@@ -193,11 +193,12 @@ This is the engine behind the `plan-review` and `multi-code-review` skills, whic
 Manages a project-local **MCP server config** in the current working directory. JSON is the single source of truth; the Codex TOML is derived from it at runtime via `jq`.
 
 ```bash
-agents-mcp <add|rm>
+agents-mcp add <database>
+agents-mcp rm
 ```
 
-- `add` — writes `.mcp.json` (Claude Code format) and `.codex/config.toml` (Codex format) into the current directory. The bundled config defines a `postgres` MCP server that runs `crystaldba/postgres-mcp` via Docker in restricted/read-only access mode.
-- `rm` — removes both files and the `.codex` directory if left empty.
+- `add <database>` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. The bundled config defines a `postgres` MCP server that runs `crystaldba/postgres-mcp` via Docker in restricted/read-only access mode and points `DATABASE_URI` at `<database>`.
+- `rm` — removes all generated files and the `.codex` directory if left empty.
 - **Exit codes:** `0` success · `1` bad usage, missing `jq`, or `rm` with no file present.
 
 ### `git-release`
