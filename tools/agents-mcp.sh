@@ -36,7 +36,7 @@ readonly JSON_CONFIG_TEMPLATE='{
         "--access-mode=restricted"
       ],
       "env": {
-        "DATABASE_URI": "postgres://human_ro@0.0.0.0:5433/{database}"
+        "DATABASE_URI": "postgres://human_ro@0.0.0.0:{port}/{database}"
       }
     }
   }
@@ -72,7 +72,7 @@ readonly JQ_TO_OPENCODE='{
 usage() {
   cat <<'EOF'
 Usage:
-  agents-mcp.sh add <database>
+  agents-mcp.sh add [database] [port]
   agents-mcp.sh rm
 
 Commands:
@@ -82,14 +82,17 @@ EOF
 }
 
 die() {
+  usage >&2
+  echo >&2
   echo "Error: $*" >&2
   exit 1
 }
 
 render_json_config() {
-  local database="$1"
-  jq --arg database "$database" '
-    .mcpServers.postgres.env.DATABASE_URI |= gsub("\\{database\\}"; $database)
+  local database="$1" port="$2"
+  jq --arg database "$database" --arg port "$port" '
+    .mcpServers.postgres.env.DATABASE_URI |=
+      (gsub("\\{database\\}"; $database) | gsub("\\{port\\}"; $port))
   ' <<<"$JSON_CONFIG_TEMPLATE"
 }
 
@@ -118,13 +121,13 @@ remove_file() {
 }
 
 add_config() {
-  local database="$1"
+  local database="$1" port="${2:-5432}"
 
   [[ -n "$database" ]] || die "database name must not be empty."
   command -v jq >/dev/null || die "jq is required to generate the TOML config."
 
   local json_config
-  json_config="$(render_json_config "$database")"
+  json_config="$(render_json_config "$database" "$port")"
 
   local base="$(pwd)"
   write_file "$base/$JSON_FILE" "$json_config"
@@ -147,25 +150,19 @@ main() {
       exit 0
       ;;
     add)
-      [[ $# -eq 2 ]] || {
-        usage >&2
-        die "add requires exactly one <database> argument."
-      }
-      add_config "${2:-}"
+      [[ $# -eq 2 || $# -eq 3 ]] ||
+        die "add requires a [database] argument and an optional [port]."
+      add_config "${2:-}" "${3:-}"
       ;;
     rm)
-      [[ $# -eq 1 ]] || {
-        usage >&2
+      [[ $# -eq 1 ]] ||
         die "rm does not accept additional arguments."
-      }
       rm_config
       ;;
     "")
-      usage >&2
       die "missing <add|rm> argument."
       ;;
     *)
-      usage >&2
       die "unknown command '$1'."
       ;;
   esac
