@@ -53,7 +53,9 @@
 
 ## Language skills
 
-When reading or editing a file, load the skill for its language before producing code. Open only the reference files within the skill that are relevant to the task at hand — do not load everything up front.
+> **IMPORTANT: This rule is MANDATORY and MUST be followed without exception.**
+
+Before reading or editing a file, you MUST load the skill for its language if one exists in the table below. Load it first before reading the file, producing code, or any other action on that file.
 
 | Language | Trigger files | Skill |
 |----------|--------------|-------|
