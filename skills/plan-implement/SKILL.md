@@ -48,11 +48,23 @@ Work through the plan's **Implementation Steps** in order. For each step:
 1. Read any files you need to understand before editing.
 2. Make the changes described by the step.
 3. Verify correctness — run tests, type-check, or lint as appropriate for the language and project.
-4. Commit once the step (or a small group of tightly related steps) is complete and the code compiles or passes basic checks.
+4. Commit the change, following the [Commit format](#commit-format) below.
 
-Do not commit after every tiny edit. Commit at logical checkpoints — when a coherent, self-contained piece of work is done.
+Commit so the history reads as a clean sequence of reviewable diffs: one logical change per commit, each building and passing basic checks on its own. Do not bundle unrelated changes into one commit, and do not commit work that does not compile. Combine tightly related steps into a single commit only when they form one indivisible change; split a step across several commits when it contains distinct logical changes.
 
-## Step 4 — Commit format
+If a step cannot be completed as written, see [Handling blockers](#handling-blockers) below.
+
+## Step 4 — Report completion
+
+When all steps are done (or all unblocked steps are done), summarize to the user:
+
+- Steps completed and commits made (one line each).
+- Steps skipped and why (if any).
+- Open questions or follow-up actions required.
+
+Do not reproduce the plan content verbatim — reference step numbers and titles only.
+
+## Commit format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -74,7 +86,7 @@ Keep commit messages short and focused on *what* changed and *why*.
 - Never commit files with unstaged or pre-existing changes that you did not make — only commit files you explicitly modified or created during this task.
 - Never commit the plan doc file itself (`.agents/plans/…`).
 
-## Step 5 — Handle blockers
+## Handling blockers
 
 If a step cannot be completed as written (missing dependency, ambiguous requirement, external sign-off needed):
 
@@ -83,13 +95,3 @@ If a step cannot be completed as written (missing dependency, ambiguous requirem
 3. After finishing all unblocked steps, report the blockers to the user with the specific question or action needed to unblock each one.
 
 Do not silently omit work or invent a workaround that changes the plan's intent. Surface blockers explicitly.
-
-## Step 6 — Report completion
-
-When all steps are done (or all unblocked steps are done), summarize to the user:
-
-- Steps completed and commits made (one line each).
-- Steps skipped and why (if any).
-- Open questions or follow-up actions required.
-
-Do not reproduce the plan content verbatim — reference step numbers and titles only.
