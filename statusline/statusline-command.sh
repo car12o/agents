@@ -2,6 +2,7 @@
 input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name')
+EFFORT=$(echo "$input" | jq -r '.effort.level // empty')
 DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
@@ -28,6 +29,9 @@ git rev-parse --git-dir > /dev/null 2>&1 && BRANCH=" |  $(git branch --show-curr
 
 COST_FMT=$(printf '$%.2f' "$COST")
 
+MODEL_STR="$MODEL"
+[ -n "$EFFORT" ] && MODEL_STR="$MODEL $EFFORT"
+
 RATE_STR=""
 if [ -n "$RATE_5H" ]; then
   R5H=$(printf '%.0f' "$RATE_5H")
@@ -44,4 +48,4 @@ if [ -n "$RATE_7D" ]; then
   RATE_STR="${RATE_STR} | ${C7D}7d: ${R7D}%${RESET}"
 fi
 
-echo -e "${BLUE}[$MODEL]${RESET} ${CYAN}${DIR##*/}${RESET}${PURPLE}$BRANCH${RESET} | ${BAR_COLOR}${BAR} ${PCT}%${RESET} | ${YELLOW}${COST_FMT}${RESET} | ⏱️ ${MINS}m ${SECS}s${RATE_STR}"
+echo -e "${BLUE}[$MODEL_STR]${RESET} ${CYAN}${DIR##*/}${RESET}${PURPLE}$BRANCH${RESET} | ${BAR_COLOR}${BAR} ${PCT}%${RESET} | ${YELLOW}${COST_FMT}${RESET} | ⏱️ ${MINS}m ${SECS}s${RATE_STR}"
