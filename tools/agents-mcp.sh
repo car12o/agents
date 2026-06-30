@@ -20,7 +20,7 @@ readonly JSON_FILE=".mcp.json"
 readonly TOML_FILE=".codex/config.toml"
 readonly OPENCODE_FILE="opencode.json"
 
-readonly JSON_CONFIG_TEMPLATE='{
+readonly JSON_CONFIG='{
   "mcpServers": {
     "postgres": {
       "command": "docker",
@@ -36,7 +36,7 @@ readonly JSON_CONFIG_TEMPLATE='{
         "--access-mode=restricted"
       ],
       "env": {
-        "DATABASE_URI": "postgres://human_ro@0.0.0.0:{port}/{database}"
+        "DATABASE_URI": "postgres://human_ro@0.0.0.0:5432/database"
       }
     }
   }
@@ -72,38 +72,32 @@ readonly JQ_TO_OPENCODE='{
 usage() {
   cat <<'EOF'
 Usage:
-  agents-mcp.sh add [database] [port]
+  agents-mcp.sh add [database-uri]
   agents-mcp.sh rm
 
 Commands:
   add  Write .mcp.json, .codex/config.toml and opencode.json to the current directory.
+       Pass [database-uri] to override the default DATABASE_URI.
   rm   Remove .mcp.json, .codex/config.toml and opencode.json from the current directory.
 EOF
 }
 
 die() {
-  usage >&2
-  echo >&2
   echo "Error: $*" >&2
   exit 1
 }
 
 render_json_config() {
-  local database="$1" port="$2"
-  jq --arg database "$database" --arg port "$port" '
-    .mcpServers.postgres.env.DATABASE_URI |=
-      (gsub("\\{database\\}"; $database) | gsub("\\{port\\}"; $port))
-  ' <<<"$JSON_CONFIG_TEMPLATE"
+  local uri="$1"
+  jq --arg uri "$uri" '.mcpServers.postgres.env.DATABASE_URI = $uri' <<<"$JSON_CONFIG"
 }
 
 json_to_toml() {
-  local json_config="$1"
-  jq -r "$JQ_TO_TOML" <<<"$json_config"
+  jq -r "$JQ_TO_TOML" <<<"$1"
 }
 
 json_to_opencode() {
-  local json_config="$1"
-  jq "$JQ_TO_OPENCODE" <<<"$json_config"
+  jq "$JQ_TO_OPENCODE" <<<"$1"
 }
 
 write_file() {
@@ -121,13 +115,11 @@ remove_file() {
 }
 
 add_config() {
-  local database="$1" port="${2:-5432}"
-
-  [[ -n "$database" ]] || die "database name must not be empty."
+  local uri="${1:-}"
   command -v jq >/dev/null || die "jq is required to generate the TOML config."
 
-  local json_config
-  json_config="$(render_json_config "$database" "$port")"
+  local json_config="$JSON_CONFIG"
+  [[ -n "$uri" ]] && json_config="$(render_json_config "$uri")"
 
   local base="$(pwd)"
   write_file "$base/$JSON_FILE" "$json_config"
@@ -150,19 +142,18 @@ main() {
       exit 0
       ;;
     add)
-      [[ $# -eq 2 || $# -eq 3 ]] ||
-        die "add requires a [database] argument and an optional [port]."
-      add_config "${2:-}" "${3:-}"
+      [[ $# -le 2 ]] || die "add accepts an optional [database-uri] argument."
+      add_config "${2:-}"
       ;;
     rm)
-      [[ $# -eq 1 ]] ||
-        die "rm does not accept additional arguments."
       rm_config
       ;;
     "")
+      usage >&2
       die "missing <add|rm> argument."
       ;;
     *)
+      usage >&2
       die "unknown command '$1'."
       ;;
   esac
