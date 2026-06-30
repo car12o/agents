@@ -121,4 +121,4 @@ Do not take agent findings at face value. For every finding (agent or your own):
 4. Check whether other agents or your own review corroborate or contradict it.
 5. Discard findings not substantiated by the actual code.
 
-Produce the **Final Review Report** using the same six-section template. List only verified findings, attributed to the source(s) that raised them (agent name or "orchestrator"). End with a **Summary** (2–4 sentences): overall risk level (low / medium / high) and the most important action items.
+Produce the **Final Review Report** using the same six-section template. List only verified findings, attributed to the source(s) that raised them (agent name or "orchestrator"). State which agents contributed usable findings and which produced none (timeout / error / empty / narration-only), so review coverage is transparent. End with a **Summary** (2–4 sentences): overall risk level (low / medium / high) and the most important action items.
