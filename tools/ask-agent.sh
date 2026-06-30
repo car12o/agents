@@ -63,7 +63,7 @@ die() {
 resolve_agent() {
   case "$1" in
     claude)   CMD=(claude -p --model claude-opus-4-8) ;;
-    codex)    CMD=(codex exec --skip-git-repo-check) ;;
+    codex)    CMD=(codex exec --model gpt-5.5 --skip-git-repo-check) ;;
     glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.2-max) ;;
     minimax)  CMD=(opencode run --model llm-netdata-cloud/minimax-m3-coder) ;;
     kimi)     CMD=(opencode run --model llm-netdata-cloud/kimi-k2.7-code) ;;
