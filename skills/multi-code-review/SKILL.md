@@ -28,7 +28,7 @@ Then run the following only to write the neutral summary in Step 2 — do not pa
 
 ## Step 2 — Write the prompt file
 
-Create a temp file with `mktemp` (e.g. `$(mktemp /tmp/review-prompt.XXXXXX)`) and write the prompt to it. Include only:
+Generate a temp path with `mktemp -u` (e.g. `$(mktemp -u /tmp/review-prompt.XXXXXX)`), then write the prompt to it - the `-u` flag is required so the file isn't created yet - Include only:
 
 - The neutral change summary from Step 1.
 - The branch name and base branch (e.g. "branch: feat/foo, base: develop").

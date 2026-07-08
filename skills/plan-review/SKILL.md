@@ -22,7 +22,7 @@ If no plan exists, stop and tell the user.
 
 > **Important:** agents have full access to the repository and will read the plan file themselves. Never copy plan content into the prompt file — pass only the file path and any context agents cannot derive on their own.
 
-Create a temp file with `mktemp` (e.g. `$(mktemp /tmp/plan-review-prompt.XXXXXX)`) and write the following to it — substituting `<plan path>` with the resolved absolute path to the plan file:
+Generate a temp path with `mktemp -u` (e.g. `$(mktemp -u /tmp/plan-review-prompt.XXXXXX)`), then write the following to it — the `-u` flag is required so the file isn't created yet — substituting `<plan path>` with the resolved absolute path to the plan file:
 
 ```
 You are reviewing the implementation plan at: <plan path>
