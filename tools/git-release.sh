@@ -16,8 +16,14 @@ error() {
 
 bump="$1"
 
-current_branch=$(git rev-parse --abbrev-ref HEAD)
-git switch ${current_branch} && git pull
+default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+if [[ -z "$default_branch" ]]; then
+  default_branch=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+fi
+[[ -z "$default_branch" ]] && error "could not determine the repository's default branch"
+
+git switch "$default_branch"
+git pull --ff-only
 tag=$(git describe --tags --abbrev=0 2>/dev/null) || error "no git tags found"
 
 if [[ ! "$tag" =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
@@ -35,5 +41,5 @@ case "$bump" in
   patch) new_ver="${major}.${minor}.$((patch + 1))" ;;
 esac
 
-git switch -c "release/${new_ver}" "origin/${current_branch}"
+git switch -c "release/${new_ver}" "origin/${default_branch}"
 git push -u origin "release/${new_ver}"
