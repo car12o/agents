@@ -51,7 +51,7 @@ Each finding must use this format exactly:
 **Issue:** What is wrong
 **Description:** Detailed explanation of the problem — include data flows, call chains, or state transitions that make the issue concrete. Show how the bad value/path/race reaches the point of failure.
 **Impact:** Why it matters
-**Comment:** A clean, concise comment ready to post on the PR - no severity labels or section jargon.
+**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, no severity labels or section jargon, concrete enough that the author can act on it without seeing the rest of this report.
 **Files:** `path/to/file:line` (add one per line for multiple)
 **Fix:** Concrete suggestion, or "unclear"
 **Source:** Which agent(s) or reviewer reported this finding (e.g. "claude, kimi" or "orchestrator")
