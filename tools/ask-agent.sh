@@ -21,7 +21,7 @@
 set -euo pipefail
 
 readonly TIMEOUT="15m"
-readonly VALID_AGENTS="claude, codex, glm, minimax, kimi, qwen, deepseek"
+readonly VALID_AGENTS="claude, codex, glm, minimax, kimi, qwen, deepseek, gemini"
 readonly RULES='⚠️ ⚠️ ⚠️  CRITICAL RULES — YOU MUST OBEY THESE WITHOUT EXCEPTION  ⚠️ ⚠️ ⚠️
 
 1. You are running in **READ-ONLY MODE**. You MUST NOT create, modify, or delete
@@ -48,6 +48,7 @@ Agents:
   kimi      Moonshot Kimi (via opencode)
   qwen      Alibaba Qwen (via opencode)
   deepseek  DeepSeek (via opencode)
+  gemini    Google Gemini (via opencode)
 
 The prompt is read from <prompt-file>.
 The agent call is wrapped in `timeout 15m`.
@@ -62,13 +63,14 @@ die() {
 # Sets the global CMD array based on the agent name.
 resolve_agent() {
   case "$1" in
-    claude)   CMD=(claude -p --model claude-opus-4-8) ;;
-    codex)    CMD=(codex exec --model gpt-5.5 --skip-git-repo-check) ;;
-    glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.2-max) ;;
+    claude)   CMD=(claude -p --model claude-opus-4-8 --effort xhigh) ;;
+    codex)    CMD=(codex exec --model gpt-5.6-sol --skip-git-repo-check) ;;
+    glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.2 --variant high) ;;
     minimax)  CMD=(opencode run --model llm-netdata-cloud/minimax-m3-coder) ;;
-    kimi)     CMD=(opencode run --model llm-netdata-cloud/kimi-k2.7-code) ;;
+    kimi)     CMD=(opencode run --model github-copilot/kimi-k2.7-code) ;;
     qwen)     CMD=(opencode run --model llm-netdata-cloud/qwen3.7-plus) ;;
-    deepseek) CMD=(opencode run --model llm-netdata-cloud/deepseek-v4-pro) ;;
+    deepseek) CMD=(opencode run --model llm-netdata-cloud/deepseek-v4-pro --variant high) ;;
+    gemini)   CMD=(opencode run --model github-copilot/gemini-3.5-flash --variant high) ;;
     *)        die "unknown agent '$1'. Valid agents: $VALID_AGENTS" ;;
   esac
 }

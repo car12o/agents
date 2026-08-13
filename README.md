@@ -61,7 +61,7 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | `make`     | the installer | core requirement |
 | Claude Code (`claude`) | `install-claude`, `ask-agent claude` | reads `~/.claude/CLAUDE.md` and `~/.claude/skills` |
 | Codex (`codex`) | `install-codex`, `ask-agent codex` | reads `~/.codex/AGENTS.md` and `~/.codex/skills` |
-| OpenCode (`opencode`) | `install-opencode`, `ask-agent glm/minimax/kimi/qwen/deepseek` | reads `~/.config/opencode` |
+| OpenCode (`opencode`) | `install-opencode`, `ask-agent glm/minimax/kimi/qwen/deepseek/gemini` | reads `~/.config/opencode` |
 | `jq` | `agents-mcp`, statusline | JSON parsing / TOML generation |
 | `perl` | `ask-agent` | strips `<think>…</think>` blocks from responses |
 | `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` server |
@@ -185,6 +185,7 @@ ask-agent <agent> <prompt-file>
 | `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/kimi-k2.7-code` |
 | `qwen` | Alibaba Qwen (via OpenCode) | `opencode run --model …/qwen3.7-plus` |
 | `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4-pro` |
+| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.5-flash` |
 
 This is the engine behind the `plan-review` and `multi-code-review` skills, which fan out to several of these agents in parallel and cross-check their findings.
 
