@@ -1,6 +1,7 @@
 ---
 name: plan-doc
 description: Produce a structured implementation plan document and save it to disk. Use when asked to write, create, or generate an implementation plan, design doc, or technical spec for a feature or change.
+disable-model-invocation: true
 ---
 
 # Skill: plan-doc
@@ -11,10 +12,10 @@ Produce a structured implementation plan document and save it to disk.
 
 1. **Gather minimum required context before writing.** You need at minimum: (a) what is being built, (b) why it matters now. Ask only for these blockers; capture everything else as assumptions or Open Questions. Do not ask about non-blocking details.
 2. **Derive the slug** from the plan's subject: lowercase ASCII, strip punctuation, collapse whitespace to single hyphens, ≤ 5 words (e.g. `auth-token-refresh`). If no clear subject exists, ask the user.
-3. **Compute the timestamp** using the shell: `date +%Y%m%d%H%M%S` (YYYYMMDDHHMMSS).
+3. **Compute the timestamp(s).** Capture one base epoch: `base=$(date +%s)`. A single plan uses `date -d "@$base" +%Y%m%d%H%M%S` (YYYYMMDDHHMMSS). When writing multiple plans (see Splitting), order them so every prerequisite precedes its dependents, then give the k-th plan (k = 0, 1, 2, …) the timestamp `date -d "@$((base + k))" +%Y%m%d%H%M%S`. This guarantees a prerequisite's filename sorts before anything depending on it.
 4. **Write the plan** to `.agents/plans/<YYYYMMDDHHMMSS>-<slug>.md` relative to the working directory. Use `mkdir -p` to create the full path. Before writing, check whether the target path already exists; if it does, increment a numeric suffix (`<YYYYMMDDHHMMSS>-<slug>-2.md`, `-3.md`, …) until an unused filename is found.
 
-**Splitting guidance:** Each plan must be an independently executable and reviewable unit of work — something that could be opened, reviewed, and merged as a standalone PR. Split when: the plan has more than ~10 implementation steps, it spans more than two major subsystems, or any section of it cannot be completed without first shipping a different section. When splitting, link the resulting plans to each other via References and note the execution order in Dependencies & Prerequisites.
+**Splitting guidance:** Each plan must be an independently executable and reviewable unit of work — something that could be opened, reviewed, and merged as a standalone PR. Split when: the plan has more than ~10 implementation steps, it spans more than two major subsystems, or any section of it cannot be completed without first shipping a different section. When splitting, link the resulting plans to each other via References, note the execution order in Dependencies & Prerequisites, and assign timestamps in that order (step 3).
 
 ## Plan Template
 
