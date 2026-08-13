@@ -86,6 +86,7 @@ ask-agent <agent> <prompt-file>
 | `kimi`     | Moonshot Kimi         |
 | `qwen`     | Alibaba Qwen          |
 | `deepseek` | DeepSeek              |
+| `gemini`   | Google Gemini         |
 
 ### Output
 
