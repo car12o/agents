@@ -47,7 +47,9 @@ Check for: vague or unmeasurable goals, success criteria that cannot be verified
 <findings>
 
 ## Design soundness
-Check for: unjustified decisions, alternatives dismissed without rationale, missing key decisions, design that contradicts stated goals.
+Check for: unjustified decisions, alternatives dismissed without rationale, materially better alternatives the plan does not consider, missing key decisions, design that contradicts stated goals.
+
+Report any materially better design for the same goals — simpler, more robust, lower risk, or reusing something already in the repository — as a finding: Issue names the plan's choice and your alternative; Recommendation states why it is better and what it costs. If the plan rejected it, address its stated reason. A marginal alternative is not a finding.
 
 <findings>
 
@@ -103,7 +105,7 @@ Do not take agent findings at face value. For every finding (agent or your own):
 
 Categorize each verified finding as one of:
 - **Clear fix** — the correct resolution is unambiguous (e.g. a missing step, an undeclared dependency, a broken success criterion). Apply it directly.
-- **Decision required** — the resolution involves a real tradeoff or open question that the user must answer (e.g. choosing between two architectures, accepting a known risk). Do not apply these unilaterally.
+- **Decision required** — the resolution involves a real tradeoff or open question that the user must answer (e.g. choosing between two architectures, accepting a known risk). Do not apply these unilaterally. A proposed alternative design is always decision required, even when every agent agrees on it.
 
 ## Step 5 — Prompt for decisions
 

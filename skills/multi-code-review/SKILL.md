@@ -45,13 +45,13 @@ Branch under review: <branch>, base: <base>.
 
 **SCOPE RULE:** You MUST ONLY report issues introduced by the branch under review. Do NOT report issues in pre-existing code unrelated to the branch changes.
 
-Each finding must use this format exactly:
+Each finding must use this format exactly, except in the Alternative approaches section, which defines its own format:
 
 **Severity:** critical | high | medium | low
 **Issue:** What is wrong
+**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, no severity labels or section jargon, concrete enough that the author can act on it without seeing the rest of this report.
 **Description:** Detailed explanation of the problem — include data flows, call chains, or state transitions that make the issue concrete. Show how the bad value/path/race reaches the point of failure.
 **Impact:** Why it matters
-**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, no severity labels or section jargon, concrete enough that the author can act on it without seeing the rest of this report.
 **Files:** `path/to/file:line` (add one per line for multiple)
 **Fix:** Concrete suggestion, or "unclear"
 **Source:** Which agent(s) or reviewer reported this finding (e.g. "claude, kimi" or "orchestrator")
@@ -90,6 +90,23 @@ Check for: untested code paths, missing edge cases, tests that don't verify real
 Check for: removed or renamed APIs, changed function signatures, altered behavior of existing features, missing migration guidance.
 
 <findings>
+
+## Alternative approaches
+Report every materially better alternative that fits inside this PR — simpler, more robust, removes a class of bugs, drops a dependency, or reuses an existing pattern or helper in this repository. Architectural changes belong in plan review. Respect constraints stated in the change summary; if the author rejected an alternative, address their stated reason. A marginal alternative is not a finding.
+
+Use this format for each alternative instead of the finding format above:
+
+**Current approach:** What the branch does
+**Alternative:** What to do instead
+**Why better:** Concrete benefit, with `path/to/file:line` of an existing precedent if there is one
+**Tradeoff:** What is lost or made harder
+**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, concrete enough that the author can act on it without seeing the rest of this report.
+**Files:** `path/to/file:line` (add one per line for multiple)
+**Source:** Which agent(s) or reviewer reported this (e.g. "claude, kimi" or "orchestrator")
+
+If none: _No better approach identified._
+
+<findings>
 ```
 
 ## Step 3 — Run agents and review in parallel
@@ -104,7 +121,7 @@ Check for: removed or renamed APIs, changed function signatures, altered behavio
 
 1. Run `git diff <base>...HEAD` to read the full diff.
 2. For each changed file, open and read the surrounding context (not just the diff hunk).
-3. Apply the same six-section checklist (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes) using the same finding format. **Discard any finding whose primary location is an unchanged line.**
+3. Apply the same seven-section checklist (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes, Alternative approaches) using the same formats. **Discard any finding whose primary location is an unchanged line.**
 4. Record your findings separately — do not merge with agent output yet.
 
 Once agents complete, read each temp file they printed.
@@ -121,4 +138,11 @@ Do not take agent findings at face value. For every finding (agent or your own):
 4. Check whether other agents or your own review corroborate or contradict it.
 5. Discard findings not substantiated by the actual code.
 
-Produce the **Final Review Report** using the same six-section template. List only verified findings, attributed to the source(s) that raised them (agent name or "orchestrator"). State which agents contributed usable findings and which produced none (timeout / error / empty / narration-only), so review coverage is transparent. End with a **Summary** (2–4 sentences): overall risk level (low / medium / high) and the most important action items.
+For every alternative approach (agent or your own), additionally:
+
+1. Confirm it would work given the actual code and the intent stated in the change summary.
+2. If it cites a repository precedent, open it and confirm it actually matches the case at hand.
+3. Discard pure style preferences and anything that does not fit inside this PR — architectural changes belong in plan review.
+4. Corroboration across agents raises confidence but does not replace checking the alternative against the code and constraints.
+
+Produce the **Final Review Report** using the same seven-section template. List only verified findings, attributed to the source(s) that raised them (agent name or "orchestrator"). State which agents contributed usable findings and which produced none (timeout / error / empty / narration-only), so review coverage is transparent. End with a **Summary** (2–4 sentences): overall risk level (low / medium / high) and the most important action items. The Summary covers defects only; alternative approaches stay in their own section and do not affect the risk level.
