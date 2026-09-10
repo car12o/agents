@@ -41,7 +41,8 @@ It ships four things:
 │   ├── plan-doc/SKILL.md
 │   ├── plan-implement/SKILL.md
 │   ├── plan-review/SKILL.md
-│   └── multi-code-review/SKILL.md
+│   ├── multi-code-review/SKILL.md
+│   └── git-flow/SKILL.md
 ├── tools/                        # Standalone shell scripts installed onto PATH
 │   ├── ask-agent.sh
 │   ├── agents-mcp.sh
@@ -64,8 +65,9 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | OpenCode (`opencode`) | `install-opencode`, `ask-agent glm/minimax/kimi/qwen/deepseek/gemini` | reads `~/.config/opencode` |
 | `jq` | `agents-mcp`, statusline | JSON parsing / TOML generation |
 | `perl` | `ask-agent` | strips `<think>…</think>` blocks from responses |
-| `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` server |
-| `git` | `git-release`, statusline | release branching, branch display |
+| `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` and `playwright` MCP servers |
+| `git` | `git-release`, `git-flow`, statusline | release branching, feature branching, branch display |
+| `gh` | `git-flow`, `multi-code-review` | opens PRs, reads PR title/body/comments |
 
 > The installer **skips** any agent whose config directory does not exist, printing a `WARNING` instead of failing. You can have only Claude installed and `make install` will still work — it just won't touch Codex or OpenCode.
 
@@ -138,7 +140,7 @@ Existing files/symlinks at the targets are removed first (`rm -f` / `rm -rf`), s
 `AGENTS.md` is the shared system-prompt-level instruction set loaded by every agent. `CLAUDE.md` is just a symlink to it, so all three agents read the identical content. It defines:
 
 - **Interaction** — substance (expert, verified, confidence-tagged claims; no hallucination), tone (blunt, no hedging), and stance (no flattery, lead with the counterargument, don't capitulate without new evidence).
-- **Engineering principles** — mandatory rules on mindset, code quality, design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
+- **Engineering principles** — mandatory rules on mindset, code quality, control flow (guard clauses, flat over nested, parse don't validate, no boolean parameters), design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
 - **Language skills** — a trigger table telling the agent to load the matching skill before reading/editing a file (e.g. load `skills/golang` for `*.go`).
 - **Available tools** — documentation for the `ask-agent` tool, including the agent table, exit codes, and the mandatory rules for fanning out to multiple agents in parallel.
 
@@ -151,12 +153,13 @@ Skills are structured workflows packaged as a directory containing a `SKILL.md` 
 | Skill | Auto-invokable | What it does |
 |-------|:--:|--------------|
 | **golang** | ✅ | Self-contained ruleset for writing idiomatic, production-grade Go. Covers style/naming, error handling, concurrency, context, testing, performance, security, modules, JSON, database, production hardening, modern stdlib, tooling, project layout, and anti-patterns. Loaded automatically when touching `*.go`, `go.mod`, or `go.sum`. |
-| **plan-doc** | ✅ | Produces a structured implementation-plan document and saves it to `.agents/plans/<timestamp>-<slug>.md`. Enforces a required template (Goal, Design, Steps, Testing, Scope, Dependencies, Open Questions, Revision Log) and splitting guidance so each plan is an independently reviewable, PR-sized unit. |
+| **plan-doc** | ❌ (explicit) | Produces a structured implementation-plan document and saves it to `.agents/plans/<timestamp>-<slug>.md`. Enforces a required 11-section template (Goal, Context & Motivation, Scope, Dependencies & Prerequisites, Design, Implementation Steps, Testing Strategy, Rollout & Migration, Open Questions, References, Revision Log) and splitting guidance so each plan is an independently reviewable, PR-sized unit. Split plans get dependency-ordered timestamps so a prerequisite always sorts before its dependents. |
 | **plan-implement** | ❌ (explicit) | Implements the most recent (or specified) plan doc. Locates the plan, creates a `<type>/<slug>` feature branch if on the HEAD branch, and commits in logical chunks using Conventional Commits. |
-| **plan-review** | ❌ (explicit) | Reviews a plan doc using multiple AI agents (via `ask-agent`), independently verifies their findings against the plan and repo, and applies the verified findings directly back to the plan file. |
-| **multi-code-review** | ❌ (explicit) | Reviews the current branch's changes against the base/HEAD branch using multiple AI agents in parallel. Syncs local refs, fans out to the agents, runs its own independent review across six dimensions (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes), then verifies every finding before compiling a final report. |
+| **plan-review** | ❌ (explicit) | Reviews a plan doc using multiple AI agents (via `ask-agent`), independently verifies their findings against the plan and repo, and applies the verified findings back to the plan file. Clear fixes are applied directly; findings that involve a real tradeoff — including any proposed alternative design — are put to the user for a decision before the plan is edited. |
+| **multi-code-review** | ❌ (explicit) | Reviews the current branch's changes against the base/HEAD branch using multiple AI agents in parallel. Syncs local refs, fans out to the agents, runs its own independent review across seven sections (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes, Alternative approaches), then verifies every finding before compiling a final report with paste-ready PR comments and per-agent finding coverage. |
+| **git-flow** | ❌ (explicit) | Stepped git flow: create a `<type>/<slug>` feature branch from an up-to-date default branch, commit already-staged changes (one commit per logical change, Conventional Commits) and push, then open a PR against the default branch. Run all three steps or select a subset by number or name (`branch`, `commit`, `pr`); selected steps always run in order. |
 
-The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it.
+The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it. `git-flow` is a standalone helper for the branch → commit → PR steps when working outside that pipeline.
 
 ---
 
@@ -178,27 +181,31 @@ ask-agent <agent> <prompt-file>
 
 | Agent | Backend | Underlying command |
 |-------|---------|--------------------|
-| `claude` | Anthropic Claude Code | `claude -p --model claude-opus-4-8` |
-| `codex` | OpenAI Codex | `codex exec --skip-git-repo-check` |
-| `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.3` |
+| `claude` | Anthropic Claude Code | `claude -p --model claude-opus-4-8 --effort xhigh` |
+| `codex` | OpenAI Codex | `codex exec --model gpt-6-astra --skip-git-repo-check` |
+| `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.3 --variant max` |
 | `minimax` | MiniMax (via OpenCode) | `opencode run --model …/minimax-m3-coder` |
-| `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/k3` |
+| `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/k3 --variant max` |
 | `qwen` | Alibaba Qwen (via OpenCode) | `opencode run --model …/qwen3.8-max` |
-| `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4-pro` |
-| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.7-flash` |
+| `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4-pro --variant max` |
+| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.7-flash --variant high` |
 
 This is the engine behind the `plan-review` and `multi-code-review` skills, which fan out to several of these agents in parallel and cross-check their findings.
 
 ### `agents-mcp`
 
-Manages a project-local **MCP server config** in the current working directory. JSON is the single source of truth; the Codex TOML is derived from it at runtime via `jq`.
+Manages a project-local **MCP server config** in the current working directory. JSON is the single source of truth; the Codex TOML and opencode JSON are derived from it at runtime via `jq`.
 
 ```bash
-agents-mcp add [database] [port]
+agents-mcp add [-m|--mcp <name>]... [-u|--uri <database-uri>]
 agents-mcp rm
 ```
 
-- `add [database] [port]` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. The bundled config defines a `postgres` MCP server that runs `crystaldba/postgres-mcp` via Docker in restricted/read-only access mode and points `DATABASE_URI` at `[database]` on the given `[port]` (defaults to `5432`).
+- `add` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. Two MCP servers are bundled, both run via Docker:
+  - `postgres` — `crystaldba/postgres-mcp` in **unrestricted** access mode, with `DATABASE_URI` defaulting to `postgres://human_ro@0.0.0.0:5432/database`. Override it with `-u/--uri`.
+  - `playwright` — `mcr.microsoft.com/playwright/mcp`.
+
+  All servers are included by default; pass `-m/--mcp <name>` (repeatable) to include only a subset. `--uri` is rejected unless `postgres` is among the selected servers.
 - `rm` — removes all generated files and the `.codex` directory if left empty.
 - **Exit codes:** `0` success · `1` bad usage, missing `jq`, or `rm` with no file present.
 
@@ -210,8 +217,9 @@ Cuts a release branch by bumping the latest semver git tag.
 git-release <patch|minor|major>
 ```
 
-- Switches to the current branch, pulls, reads the latest tag via `git describe --tags`, bumps the requested component, then creates and pushes a `release/<new-version>` branch from `origin/<current-branch>`.
-- Errors out if there are no tags or the latest tag isn't valid semver.
+- Resolves the repository's default branch (from `origin/HEAD`, falling back to `git remote show origin`), switches to it, and pulls fast-forward only.
+- Reads the latest tag via `git describe --tags --abbrev=0`, extracts its `MAJOR.MINOR.PATCH` component (so `v1.2.3` works), bumps the requested part, then creates and pushes a `release/<new-version>` branch from `origin/<default-branch>`.
+- Errors out if the default branch cannot be determined, there are no tags, or the latest tag does not contain a `MAJOR.MINOR.PATCH` version.
 
 ---
 
@@ -219,7 +227,7 @@ git-release <patch|minor|major>
 
 `statusline/statusline-command.sh` is a Claude Code **statusline renderer**. It reads Claude's status JSON from stdin and prints a single colored line containing:
 
-- Model display name and current directory
+- Model display name, reasoning effort level (when present), and current directory
 - Git branch (if inside a repo)
 - A 10-segment context-usage bar that shifts green → yellow → red as usage climbs
 - Session cost in USD and elapsed wall-clock time
