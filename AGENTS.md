@@ -29,9 +29,20 @@
 
 ## Code
 - Correctness first: handle edges, concurrency, and failures.
-- Name precisely. Small, single-purpose functions.
-- No dead code, no rotting TODOs, no comments stating the obvious.
-- Don't add features, abstractions, or error handling the task doesn't need.
+- Name precisely: packages, types, functions, variables. A name says what the thing is or does, not how it works.
+- Functions are small and single-purpose: one responsibility, one level of abstraction, readable top to bottom.
+- No dead code, no commented-out code, no rotting TODOs.
+- Comments say *why*, in one plain sentence: intent, invariant, workaround. A *what* comment means rename or extract. No narration, banners, or restated names.
+
+## Control flow
+- Every `if` is a decision: does it belong in a type, a table, or the caller?
+- Flat over nested: guard clauses, early returns, happy path at indentation zero. One nesting level per function; deeper means extract or redesign.
+- Decide once, at the boundary. Parse input into a type that cannot be wrong; the core never re-checks. Parse, don't validate.
+- Branching on *kind* in two places → missing polymorphism. Branching on *data* → lookup table, not an if-chain. `else if` chain → switch. Switch repeated, or doing work in `default` → state machine; name its states.
+- No boolean or mode parameters: a `bool` argument is two functions fused; a flag threaded through branches is a missing type.
+- Handle a failure where something can be done about it, propagate everywhere else. Domain logic never lives inside error branches.
+- Abstraction removes decisions from callers; indirection hides them. A forwarding wrapper or a one-impl interface without a test seam is indirection.
+- Vary behavior by composition (middleware, options, pipelines), never one function with N flags.
 
 ## Principles & patterns
 - SOLID, DRY, YAGNI, KISS — as vocabulary, applied with judgment, never dogma.
