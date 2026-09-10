@@ -180,12 +180,12 @@ ask-agent <agent> <prompt-file>
 |-------|---------|--------------------|
 | `claude` | Anthropic Claude Code | `claude -p --model claude-opus-4-8` |
 | `codex` | OpenAI Codex | `codex exec --skip-git-repo-check` |
-| `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.2-max` |
+| `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.3` |
 | `minimax` | MiniMax (via OpenCode) | `opencode run --model …/minimax-m3-coder` |
-| `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/kimi-k2.7-code` |
-| `qwen` | Alibaba Qwen (via OpenCode) | `opencode run --model …/qwen3.7-plus` |
+| `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/k3` |
+| `qwen` | Alibaba Qwen (via OpenCode) | `opencode run --model …/qwen3.8-max` |
 | `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4-pro` |
-| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.5-flash` |
+| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.7-flash` |
 
 This is the engine behind the `plan-review` and `multi-code-review` skills, which fan out to several of these agents in parallel and cross-check their findings.
 

@@ -64,13 +64,13 @@ die() {
 resolve_agent() {
   case "$1" in
     claude)   CMD=(claude -p --model claude-opus-4-8 --effort xhigh) ;;
-    codex)    CMD=(codex exec --model gpt-5.6-sol --skip-git-repo-check) ;;
-    glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.2 --variant high) ;;
+    codex)    CMD=(codex exec --model gpt-6-astra --skip-git-repo-check) ;;
+    glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.3 --variant max) ;;
     minimax)  CMD=(opencode run --model llm-netdata-cloud/minimax-m3-coder) ;;
-    kimi)     CMD=(opencode run --model github-copilot/kimi-k2.7-code) ;;
-    qwen)     CMD=(opencode run --model llm-netdata-cloud/qwen3.7-plus) ;;
-    deepseek) CMD=(opencode run --model llm-netdata-cloud/deepseek-v4-pro --variant high) ;;
-    gemini)   CMD=(opencode run --model github-copilot/gemini-3.5-flash --variant high) ;;
+    kimi)     CMD=(opencode run --model llm-netdata-cloud/k3 --variant max) ;;
+    qwen)     CMD=(opencode run --model llm-netdata-cloud/qwen3.8-max) ;;
+    deepseek) CMD=(opencode run --model llm-netdata-cloud/deepseek-v4-pro --variant max) ;;
+    gemini)   CMD=(opencode run --model github-copilot/gemini-3.7-flash --variant high) ;;
     *)        die "unknown agent '$1'. Valid agents: $VALID_AGENTS" ;;
   esac
 }
