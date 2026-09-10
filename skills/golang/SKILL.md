@@ -1,6 +1,6 @@
 ---
 name: golang
-description: Write idiomatic, production-grade Go. Self-contained — all rules inline, no reference files. Use when editing .go files, go.mod, go.sum, or Go tests, or when asked to design, generate, or review Go code. Covers style, errors, concurrency, context, testing, performance, security, modules, JSON, database, production hardening, modern stdlib, tooling, and project layout.
+description: Write idiomatic, production-grade Go. Self-contained — all rules inline, no reference files. Use when editing .go files, go.mod, go.sum, or Go tests, or when asked to design, generate, or review Go code. Covers style, control flow, errors, concurrency, context, testing, performance, security, modules, JSON, database, production hardening, modern stdlib, tooling, and project layout.
 ---
 
 # Skill: golang
@@ -35,10 +35,17 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - HTTP middleware: `type Middleware func(http.Handler) http.Handler`; a `Chain(h, mw...)` helper applies them in reverse (`for i := len(mw)-1; i >= 0; i--`) so the first-listed middleware is the outermost wrapper.
 - Load config once at startup, validate it (required vars present, numeric ranges sane), fail fast with a clear error, and pass it as a value — don't read env vars deep inside the app.
 
+## Control flow
+
+- Happy path at indentation zero: guard clauses and early returns; nesting depth ≤ 2, cognitive complexity ≤ 15 (`nestif`, `gocognit`). `if err != nil { return err }` is the idiom, not nesting — the smell is business logic inside error branches.
+- Sum types: sealed interface (unexported marker method) plus one `switch v := x.(type)` at the boundary. `iota` enums are switched exhaustively (`exhaustive` linter), no work in `default`.
+- A `switch` on a kind that grows or repeats becomes a dispatch table (`map[Kind]Handler` built at init) or a consumer-defined interface via constructor injection — never a `mode` field checked in every method.
+- No `bool` parameters: split the function or introduce a type.
+
 ## Documentation (godoc)
 
-- Doc comment on every exported identifier; start with the declared name, complete sentence, present tense ("Client manages…"). Separate paragraphs with blank lines; don't hand-wrap — the renderer reflows.
-- A comment that only restates the name is useless — add what the name can't say (purpose, units, invariants), or rename.
+- Doc comment on every exported identifier — the required exception to "comments say *why*". Start with the declared name, one present-tense sentence ("Client manages…"); more paragraphs (blank-line separated, not hand-wrapped — the renderer reflows) only for units, invariants, concurrency safety, or error semantics.
+- A doc comment that only restates the name is useless — say what the name can't, or rename.
 - One package comment per package (above any one `package` clause; long ones go in `doc.go`).
 - `Deprecated:` marker must be its own paragraph (blank line before) for tools to detect it.
 - `Example*` functions in `_test.go` are runnable, verified docs — prefer over prose. Naming: `ExampleFoo`, `ExampleClient_Publish`, `ExampleClient_Publish_withRetry`.
@@ -80,15 +87,16 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - Every goroutine needs a shutdown path (context, done channel, or errgroup) — otherwise it leaks → eventual OOM.
 - Start goroutines in the caller; the caller owns lifecycle and concurrency strategy.
 - `errgroup` over bare `WaitGroup` when goroutines can fail; `g.SetLimit(n)` for bounded fan-out. `errgroup` does not recover panics.
+- `wg.Go(f)` (1.25+) over `wg.Add(1)` + `go func(){ defer wg.Done(); ... }()` — the count can't drift or race `Wait`. Pre-1.25: `Add(1)` in the caller (never inside the goroutine), `defer wg.Done()` as the first line. Neither returns errors or recovers panics — that's `errgroup`.
 - A bare `go func()` at a deliberate isolation boundary (middleware, supervisor) must `recover` and report; goroutines elsewhere still need a shutdown path but should let panics surface.
 - Mutexes for shared state, channels for signaling/orchestration. Don't reach for channels where a mutex is simpler.
 - Maps are not goroutine-safe — concurrent read+write is a fatal runtime error: `sync.Mutex`+map, or `sync.Map` for read-heavy disjoint keys.
 - One owner closes each channel: the producing stage in a pipeline; with multiple senders, a coordinator closes after all senders finish (never a sender). Producers respect `ctx`; consumers `select` on `<-ctx.Done()` so a send never blocks forever after the reader stops.
-- Worker pool over a shared `jobs` channel: `n` workers each `range` the channel and `select` their result-send against `<-ctx.Done()`; close `jobs` to signal completion, then `wg.Wait()` before `close(results)`. Reach for this over `errgroup` when work arrives continuously rather than from a fixed slice.
+- Worker pool over a shared `jobs` channel: `n` workers (`wg.Go`) each `range` the channel and `select` their result-send against `<-ctx.Done()`; close `jobs` to signal completion, then `wg.Wait()` before `close(results)`. Reach for this over `errgroup` when work arrives continuously rather than from a fixed slice.
 - Rate limiting: `golang.org/x/time/rate` (`limiter.Wait(ctx)`), not a ticker plus a goroutine per request.
 - `sync.Once` / `sync.OnceValue`/`OnceValues` (1.21+) for lazy singletons; `OnceValues` returns value+error.
 - `singleflight` (`golang.org/x/sync`) to dedupe concurrent calls for one key (cache stampede); run the shared call under a context not tied to any single caller, so a canceller can't poison the flight. `Do` returns a `shared` bool (`DoChan`: `Result.Shared`) reporting fan-out to multiple callers.
-- Go 1.22+ (per `go.mod`) gives each `:=`-declared loop variable a fresh instance per iteration — the `v := v` re-bind before `go`/`g.Go` is no longer needed.
+- Go 1.22+ (per `go.mod`) gives each `:=`-declared loop variable a fresh instance per iteration — the `v := v` re-bind before `go`/`g.Go`/`wg.Go` is no longer needed.
 
 ## Boundaries, validation & security
 
@@ -177,10 +185,11 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - **1.22+:** `range` over ints (`for i := range 10`).
 - **1.23+:** iterators (`iter.Seq`/`Seq2`, range-over-func — shape: `func All() iter.Seq2[K,V] { return func(yield func(K,V) bool) { ... } }`); `slices.Collect`/`Values`/`All` and `maps.Keys`/`Values`/`Collect` bridge them (`maps.Keys`/`Values` return iterators — materialize with `slices.Collect`/`slices.Sorted`); timer channels are unbuffered and unreferenced timers are GC-collectible — `time.After` in loops no longer leaks, no stale tick can arrive after `Stop`/`Reset`, and the old drain-after-`Stop` pattern is obsolete (it now blocks); pre-1.23 semantics still require `Stop()` + draining stale ticks in select loops; `unique` (`unique.Make` returns a comparable `Handle[T]` — pointer-equality comparison; saves memory when many equal values repeat).
 - **1.24+:** tool directives in `go.mod` (a `tool (...)` block) replace `tools.go`, run via `go tool <name>`; `weak` (`weak.Pointer[T]` for canonicalization caches that must not prevent GC).
+- **1.25+:** `sync.WaitGroup.Go` (see Concurrency); `testing/synctest` stable (see Testing).
 - `fmt.Errorf("...%w", err)` + `errors.Is`/`As` replaces `pkg/errors` wrapping — but not its stack capture; if the project formats stacks with `%+v`, plan a replacement first. `//go:embed` (`embed.FS`, which implements `io/fs.FS`) for static assets, migrations, templates.
 
 ## Tooling & CI (run on every commit)
 
 - `go vet ./...`, `go test -race -cover ./...`, `golangci-lint run`, `govulncheck ./...`.
 - Pin `setup-go` to `go-version-file: go.mod` so CI matches the module's Go version — no drift.
-- `.golangci.yml`: start with errcheck/govet/ineffassign/staticcheck/unused/gosec/revive/gocritic/misspell; don't enable everything (false positives drown real issues). Exclude `vendor`/`testdata`. `//nolint` is a last resort.
+- `.golangci.yml`: start with errcheck/govet/ineffassign/staticcheck/unused/gosec/revive/gocritic/misspell/nestif/gocognit/exhaustive; don't enable everything (false positives drown real issues). Exclude `vendor`/`testdata`. `//nolint` is a last resort.
