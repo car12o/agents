@@ -2,10 +2,10 @@
 #
 # ask-agent.sh — Run a one-shot prompt against an LLM agent CLI, with a 15m timeout cap.
 #
-# Intended to be invoked from any tool to get a quick second opinion or delegate a task to a specific agent.
+# Intended to be invoked from any tool to get a read-only second opinion or review from a specific agent.
 #
 # Behavior:
-#   - Prompt is read from the file at <prompt-file>.
+#   - Prompt is read from the file at <prompt-file> and prepended with read-only, no-delegation rules.
 #   - Underlying agent call is wrapped in `timeout 15m`.
 #   - Exit codes:
 #       0    success
@@ -14,9 +14,9 @@
 #       *    propagated from the agent CLI
 #
 # Examples:
-#   ask-agent.sh codex ./review-prompt.md
-#   ask-agent.sh claude ./summarize.txt
-#   ask-agent.sh glm ./big-prompt.md
+#   ask-agent codex ./review-prompt.md
+#   ask-agent claude ./summarize.txt
+#   ask-agent glm ./design-review.md
 
 set -euo pipefail
 
@@ -38,7 +38,7 @@ readonly RULES='⚠️ ⚠️ ⚠️  CRITICAL RULES — YOU MUST OBEY THESE WIT
 usage() {
   cat <<'EOF'
 Usage:
-  ask-agent.sh <agent> <prompt-file>
+  ask-agent <agent> <prompt-file>
 
 Agents:
   claude    Anthropic Claude Code
@@ -50,7 +50,7 @@ Agents:
   deepseek  DeepSeek (via opencode)
   gemini    Google Gemini (via opencode)
 
-The prompt is read from <prompt-file>.
+The prompt is read from <prompt-file> and prepended with read-only rules.
 The agent call is wrapped in `timeout 15m`.
 EOF
 }

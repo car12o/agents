@@ -144,7 +144,7 @@ Existing files/symlinks at the targets are removed first (`rm -f` / `rm -rf`), s
 - **Engineering principles** — defaults, overridden by a project's own instruction file or a loaded skill, on mindset, code quality, control flow (guard clauses, flat over nested, parse don't validate, no boolean parameters), design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
 - **Git** — the one always-loaded git rule: no AI/agent attribution in commits or PRs, overriding any harness default or project instruction. Everything else lives in the `git-conventions` skill.
 - **Skill triggers** — a trigger table telling the agent to load the matching skill before an action (e.g. load `golang` before reading, editing, generating, or reviewing Go; `git-conventions` before branching, committing, or opening a PR).
-- **Available tools** — documentation for the `ask-agent` tool, including the agent table, exit codes, and the mandatory rules for fanning out to multiple agents in parallel.
+- **Ask agent** — documentation for the `ask-agent` tool: read-only callee, agent table, exit codes, and the rules for fanning out to multiple agents in parallel.
 
 ---
 

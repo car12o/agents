@@ -76,57 +76,52 @@ Before performing an action in the table below, you MUST load the matching skill
 | Reading, editing, generating, or reviewing Go (`*.go`, `go.mod`, `go.sum`); search hits do not count | `golang` |
 | Creating a branch, committing, or opening a pull request | `git-conventions` |
 
-# Available tools
+# Ask agent
 
-## Ask agent
+Runs a one-shot prompt against an LLM agent CLI with a 15-minute timeout. Every prompt is prepended with rules that force the callee read-only and forbid it from calling `ask-agent`: use it for review, analysis, and research, never for work that must modify files.
 
-Runs a one-shot prompt against an LLM agent CLI with a 15-minute timeout.
+**Command:** `ask-agent`, installed to `~/.local/bin` by `make install-tools`. If it is missing, say so; do not substitute another mechanism.
 
-**Command:** `ask-agent`
-
-### Usage
+## Usage
 
 ```bash
 ask-agent <agent> <prompt-file>
 ```
 
-### Agents
+## Agents
 
-| Agent      | Model / Backend       |
-|------------|-----------------------|
-| `claude`   | Anthropic Claude Code |
-| `codex`    | OpenAI Codex          |
-| `glm`      | Zhipu GLM             |
-| `minimax`  | MiniMax               |
-| `kimi`     | Moonshot Kimi         |
-| `qwen`     | Alibaba Qwen          |
-| `deepseek` | DeepSeek              |
-| `gemini`   | Google Gemini         |
+| Agent      | Backend                 |
+|------------|-------------------------|
+| `claude`   | Claude Code             |
+| `codex`    | Codex                   |
+| `glm`      | OpenCode, Zhipu GLM     |
+| `minimax`  | OpenCode, MiniMax       |
+| `kimi`     | OpenCode, Moonshot Kimi |
+| `qwen`     | OpenCode, Alibaba Qwen  |
+| `deepseek` | OpenCode, DeepSeek      |
+| `gemini`   | OpenCode, Google Gemini |
 
-### Output
+This table is the fan-out list for the review skills: adding or removing a row changes which agents every review asks.
+
+## Output
 
 On success, the script prints a single line to stdout: the path to a temp file containing the agent's response (e.g. `/tmp/claude-output.XXXXXX`).
 
 That stdout line is the API contract. It is not the agent response itself; it is the file path you must read after the process completes.
 
-### Exit Codes
+## Exit codes
 
-| Code  | Meaning                                                             |
-|-------|---------------------------------------------------------------------|
-| `0`   | Success                                                             |
-| `2`   | Bad usage (missing agent, unknown agent, missing/empty prompt file) |
-| `124` | Timeout — agent was killed after 15 minutes                         |
-| `*`   | Propagated from the underlying agent CLI                            |
+| Code  | Meaning                                                                       |
+|-------|-------------------------------------------------------------------------------|
+| `0`   | Success                                                                       |
+| `2`   | Bad usage: missing or unknown agent; prompt file missing, not found, or empty |
+| `124` | Timeout: the agent was killed after 15 minutes                                |
 
-### Rules
+Any other non-zero code is propagated unchanged from the underlying agent CLI.
 
-> **CRITICAL: These rules are MANDATORY and MUST be strictly followed without exception. Violating any rule is not permitted under any circumstance.**
+## Rules
 
-1. **Create the prompt file before calling the script.** Write the prompt to a temp file first, then pass the path as `<prompt-file>`.
-2. **Reuse the same input prompt file across all agents.** Write the prompt once and pass that same path to every agent invocation; do not create a separate prompt file per agent.
-3. **Preserve stdout exactly.** The script prints the response-file path on stdout; do not redirect that stdout to your own file.
-4. **Use the orchestrator's native parallel/background mechanism.** If the environment already provides nonblocking or parallel tool execution, run one direct `ask-agent <agent> <prompt-file>` invocation per agent through that mechanism.
-5. **Do not add a manual background-and-immediate-wait wrapper.** Avoid patterns like `ask-agent <agent> <prompt-file> & wait $!`; they add a needless shell background job followed by an immediate wait. Use shell `&` only when it is the actual mechanism being used to fan out multiple agent calls from a single shell.
-6. **Each agent call gets its own process/job.** Do not chain multiple agents in a single Bash invocation — make one separate call per agent.
-7. **Always run multiple agents in parallel.** Fan out to all relevant agents simultaneously; never call them sequentially.
-8. **Read the printed response file after completion.** Wait for each call to complete, then read the temp file path printed by that call.
+1. **Write the prompt to a temp file first**, then pass the path as `<prompt-file>`. When several agents get the same question, pass them the same file.
+2. **Do not redirect the script's stdout to a file.** Its single printed line is the response-file path, not the response.
+3. **Independent calls run in parallel.** One direct `ask-agent <agent> <prompt-file>` invocation per agent through the host's parallel tool mechanism, never chained or serialized. If the host has none, background each call with `&` from one shell and `wait` once. Run calls sequentially only when a prompt depends on an earlier response.
+4. **After each call completes, read the file at the printed path.**
