@@ -86,12 +86,18 @@ prepare_prompt() {
   PROMPT_FILE="$file"
 }
 
+# Some CLIs drop the opening tag of the first thinking block, leaving a bare closing tag; that leading
+# block is stripped too, unless the tag is quoted in backticks and therefore part of the answer.
+strip_thinking() {
+  perl -0777 -pe 's/<think>.*?<\/think>\n?//gs; s/\A.*?(?<!`)<\/think>\n?//s'
+}
+
 run_agent() {
   local agent="$1"
   local out
   out="$(mktemp -t "${agent}-output.XXXXXX")"
   timeout "$TIMEOUT" "${CMD[@]}" "$(echo "$RULES" && cat "$PROMPT_FILE")" \
-    | perl -0777 -pe 's/<think>.*?<\/think>\n?//gs' >"$out"
+    | strip_thinking >"$out"
   echo "$out"
 }
 
