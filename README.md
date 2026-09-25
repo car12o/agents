@@ -162,7 +162,7 @@ Skills are structured workflows packaged as a directory containing a `SKILL.md` 
 | **git-conventions** | ✅ | Shared git ruleset: default-branch detection (with fallback, never guess), `<type>/<slug>` branch naming, Conventional Commits with the prefix table, commit hygiene (one logical change per commit, only files you touched), PR title/description rules, and the no-attribution rule. Loaded automatically before creating a branch, committing, or opening a PR; the other git-touching skills reference it instead of restating it. |
 | **git-flow** | ❌ (explicit) | Stepped git flow: create a `<type>/<slug>` feature branch from an up-to-date default branch, commit already-staged changes (one commit per logical change) and push, then open a PR against the default branch. Run all three steps or select a subset by number or name (`branch`, `commit`, `pr`); selected steps always run in order. |
 
-The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it. `git-flow` is a standalone helper for the branch → commit → PR steps when working outside that pipeline. Both defer to `git-conventions` for branch, commit, and PR rules.
+The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it. `git-flow` is a standalone helper for the branch → commit → PR steps when working outside that pipeline. Both, and `multi-code-review`, defer to `git-conventions` for branch, commit, and PR rules.
 
 ---
 

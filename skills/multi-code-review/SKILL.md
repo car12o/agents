@@ -1,62 +1,72 @@
 ---
 name: multi-code-review
-description: Review the current branch changes against HEAD using multiple AI agents. Use when asked to review code, audit a PR, or check changes before merging.
+description: Review the current branch's changes against its base with multiple AI agents. Each finding carries a paste-ready PR comment; pass `no-pr` to omit it.
 disable-model-invocation: true
 ---
 
 # Skill: multi-code-review
 
-Review the current branch changes using multiple AI agents, then compile a verified final report.
+Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it.
 
-> **Important:** agents have full access to the repository and will investigate the changes themselves. Never copy diff output or file contents into the prompt file — only include context that agents cannot fetch on their own (PR description, linked issue summaries, stated intent).
+> **Important:** agents have full access to the repository and investigate the changes themselves. The prompt file carries only what they cannot fetch: the change summary, the changed-file paths, and PR intent and discussion. Never paste diff hunks or file contents into it.
 
-## Step 1 — Sync local branches, then orient yourself
+## Step 1 — Check preconditions and pin the change set
 
-First, bring the local refs up to date so the review reflects the true latest state. This MUST run before Step 3: the spawned agents compute their own diffs against these local refs, so the sync has to happen before they launch.
+Run these checks before touching any ref. If one fails, STOP and report it. Do NOT stash, merge, rebase, or force-reset — the user decides how to resolve it.
 
-1. `git fetch --all --prune`
-2. Update the base branch without checking it out: `git fetch origin <base>:<base>` (fast-forward only; fails loudly if the local base has diverged).
-3. Update the current branch: `git pull --ff-only`.
+1. `git status --porcelain` prints nothing (clean tree).
+2. `git branch --show-current` prints a name (not detached HEAD). This is `<branch>`.
+3. `git fetch --prune origin`.
+4. If `<branch>` has an upstream (`git rev-parse --abbrev-ref @{u}` succeeds): `git pull --ff-only`; a failure means the branch diverged — STOP. With no upstream, continue and record "branch not pushed; local state reviewed" for the report.
 
-If the working tree is dirty, a branch has diverged from its remote, or there is no upstream/remote, STOP and report it. Do NOT stash, merge, rebase, or force-reset — the user decides how to resolve it.
+Resolve `<base>`, first match wins. If none matches, STOP and ask — never guess:
 
-Then run the following only to write the neutral summary in Step 2 — do not pass this to agents, and do not include the raw output in the prompt file:
+1. The base the user named.
+2. The open PR's base: `gh pr view --json number,baseRefName,title,body,comments`. Keep the other fields for Step 2. `comments` holds issue-style comments only, so also read inline review threads with `gh api repos/{owner}/{repo}/pulls/<number>/comments`. A non-zero exit means there is no PR — not an error.
+3. The default branch, resolved as the `git-conventions` skill describes (load it).
 
-1. `git diff <main-branch>...HEAD --stat` to see which files changed.
-2. `gh pr view --json title,body,comments` if a PR exists, to capture stated intent and review discussion.
-3. From the above, write neutral bullet points describing what was added/removed/modified and why (per the PR description). Do not inject opinion.
+Pin the change set to commits so every reviewer sees the same diff. The local `<base>` branch is never updated; `origin/<base>` is the reference:
+
+- `<head>` = `git rev-parse HEAD`
+- `<merge-base>` = `git merge-base origin/<base> HEAD`
+- The change set is `git diff <merge-base> <head>`. If it is empty, STOP: nothing to review.
+
+Then gather context for the change summary in Step 2 — the raw output never goes into the prompt file:
+
+1. `git diff --name-status <merge-base> <head>` for the changed-file list.
+2. The PR title, body, comments, and review threads, if a PR exists.
+3. Write neutral bullets: what was added, removed, or modified, and why (per the PR). No opinion.
 
 ## Step 2 — Write the prompt file
 
-Generate a temp path with `mktemp -u` (e.g. `$(mktemp -u /tmp/review-prompt.XXXXXX)`), then write the prompt to it - the `-u` flag is required so the file isn't created yet - Include only:
+Create a private directory with `mktemp -d` and write the prompt to `<dir>/prompt.md`. The directory is created atomically and the file inside does not exist yet, so the write tool can create it. Remove the directory once the report is done.
 
-- The neutral change summary from Step 1.
-- The branch name and base branch (e.g. "branch: feat/foo, base: develop").
-- The following instructions for the agent verbatim:
+Write the block below, substituting `<summary>`, `<changed files>`, `<branch>`, `<base>`, `<merge-base>`, and `<head>` with the values from Step 1. Leave everything else unchanged; agents write their findings where `<findings>` appears.
 
 ```
 ## Change summary
-<neutral summary of what was added/removed/modified and why>
+<summary>
+
+## Changed files
+<changed files — one path per line, with its status>
 
 ---
 
 You are performing a high-effort code review. The repository is checked out locally.
 Branch under review: <branch>, base: <base>.
 
-**SCOPE RULE:** You MUST ONLY report issues introduced by the branch under review. Do NOT report issues in pre-existing code unrelated to the branch changes.
+**SCOPE:** The change set is exactly `git diff <merge-base> <head>`. Run it yourself, per file (`-- <path>`) if it is large; refs are local and already synced — do not fetch or pull. Report only defects this change set introduces, including those caused by removed lines. Do not report pre-existing defects the change set does not touch.
 
-Each finding must use this format exactly, except in the Alternative approaches section, which defines its own format:
+Use this format for every finding, except in the Alternative approaches section, which defines its own:
 
 **Severity:** critical | high | medium | low
-**Issue:** What is wrong
-**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, no severity labels or section jargon, concrete enough that the author can act on it without seeing the rest of this report.
-**Description:** Detailed explanation of the problem — include data flows, call chains, or state transitions that make the issue concrete. Show how the bad value/path/race reaches the point of failure.
-**Impact:** Why it matters
-**Files:** `path/to/file:line` (add one per line for multiple)
-**Fix:** Concrete suggestion, or "unclear"
-**Source:** Which agent(s) or reviewer reported this finding (e.g. "claude, kimi" or "orchestrator")
+**Confidence:** high | moderate | low
+**Issue:** One sentence stating what is wrong, naming the function, value, or path at fault. A category such as "race condition" or "missing validation" is not an issue.
+**Evidence:** Every claim cited as `path/to/file:line`. For a defect: where the bad value, path, or race originates, how it propagates, and where it fails. For something missing (test, guard, error message, migration note): the changed lines that create the need, where the missing thing belongs, and what you searched to confirm it is absent. For a removal: the removed line, cited as `path/to/file:line (base)`. If you cannot cite it, drop the finding.
+**Impact:** What fails, for whom, and what triggers it. A concrete consequence (panic, wrong result, data loss, leaked secret), not an adjective.
+**Fix:** The change to make, as an instruction, and at which `path/to/file:line`. Several viable fixes: one per line with its tradeoff. A code snippet only when shorter than prose. If unknown, write "unclear" and say what decision or information is missing.
 
-Separate multiple findings with a blank line.
+Separate findings with a blank line.
 If a section has no findings, write: _No issues found._
 
 ---
@@ -94,16 +104,16 @@ Check for: removed or renamed APIs, changed function signatures, altered behavio
 ## Alternative approaches
 Report every materially better alternative that fits inside this PR — simpler, more robust, removes a class of bugs, drops a dependency, or reuses an existing pattern or helper in this repository. Architectural changes belong in plan review. Respect constraints stated in the change summary; if the author rejected an alternative, address their stated reason. A marginal alternative is not a finding.
 
-Use this format for each alternative instead of the finding format above:
+Format for each alternative:
 
-**Current approach:** What the branch does
+**Confidence:** high | moderate | low
+**Current approach:** What the change set does
 **Alternative:** What to do instead
 **Why better:** Concrete benefit, with `path/to/file:line` of an existing precedent if there is one
 **Tradeoff:** What is lost or made harder
-**Comment:** A self-contained comment ready to paste directly onto the PR — plain prose, concrete enough that the author can act on it without seeing the rest of this report.
-**Files:** `path/to/file:line` (add one per line for multiple)
-**Source:** Which agent(s) or reviewer reported this (e.g. "claude, kimi" or "orchestrator")
+**Location:** `path/to/file:line` in the change set (one per line for multiple)
 
+Separate alternatives with a blank line.
 If none: _No better approach identified._
 
 <findings>
@@ -111,38 +121,52 @@ If none: _No better approach identified._
 
 ## Step 3 — Run agents and review in parallel
 
-> **IMPORTANT:** If the user has not specified which agents to use, you MUST ask all agents listed in the `Ask agent` tool. Do not skip any agent.
+> **IMPORTANT:** If the user has not specified which agents to use, ask all agents listed in the `Ask agent` tool. Do not skip any.
 
-> **IMPORTANT:** Launch all agents simultaneously using the orchestrator's native parallel/background mechanism, then immediately begin your own review while they run. Strictly follow the instructions and rules of the `Ask agent` tool — no exceptions.
+> **IMPORTANT:** Launch all agents simultaneously with the orchestrator's native parallel/background mechanism, one call per agent, then begin your own review while they run. Follow the `Ask agent` rules — no exceptions.
 
-> **NOTE:** Local refs were already synced in Step 1. Do not fetch, pull, or otherwise mutate branches again here or during your own review.
+> **NOTE:** Do not fetch, pull, or otherwise mutate branches from here on.
 
-**Your review (do while agents are running):**
+Record each agent's exit code and stdout. Every exit prints one line: the response file path. Exit 0 means the response is complete; 124 is a timeout, 2 a usage error, anything else a CLI error, and the file holds whatever the agent produced before failing; stderr says why. A failed agent is not fatal; continue with the others.
 
-1. Run `git diff <base>...HEAD` to read the full diff.
-2. For each changed file, open and read the surrounding context (not just the diff hunk).
-3. Apply the same seven-section checklist (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes, Alternative approaches) using the same formats. **Discard any finding whose primary location is an unchanged line.**
+**Your review (while agents run):**
+
+1. Review file by file, in `--name-status` order: `git diff <merge-base> <head> -- <path>`, so a large change set is never truncated. For a removed file, read `git show <merge-base>:<path>`.
+2. Read the surrounding context of each hunk, not just the hunk.
+3. Apply the same seven sections and formats as the agents.
 4. Record your findings separately — do not merge with agent output yet.
 
-Once agents complete, read each temp file they printed.
-
-> **IMPORTANT:** You MUST NOT proceed to Step 4 until every agent job has returned. Wait for all agents to finish before reading any output or beginning compilation. Do not start Step 4 with partial results.
+Do not start Step 4 until every agent job has returned; a failed agent counts as returned. Then read each response file.
 
 ## Step 4 — Verify and compile
 
-Do not take agent findings at face value. For every finding (agent or your own):
+Do not take findings at face value — agent or your own. For every finding:
 
-1. Re-read the relevant code hunk from the diff.
-2. Verify the finding was introduced by the branch under review. Discard findings about pre-existing code unrelated to the branch changes.
-3. Confirm the finding is real (not a hallucination or misread).
-4. Check whether other agents or your own review corroborate or contradict it.
-5. Discard findings not substantiated by the actual code.
+1. Open every `path/to/file:line` cited in Evidence. If the cited code sits a few lines away, correct the citation. Discard the finding if the code does not exist or does not say what the finding claims.
+2. Confirm the change set introduces the defect: the cited lines are added, changed, or removed by `git diff <merge-base> <head>`. Discard findings about code the change set does not touch.
+3. Check Impact and Fix against the code: the trigger is real, the consequence follows, the fix applies. Correct or drop what does not hold.
+4. When several sources report the same defect, write one canonical finding: one severity, the strongest Evidence, the fix that holds, every source listed. When sources contradict each other, the cited code decides; if the finding survives, note the disagreement.
 
-For every alternative approach (agent or your own), additionally:
+For every alternative approach, apply steps 1 and 4, then:
 
-1. Confirm it would work given the actual code and the intent stated in the change summary.
-2. If it cites a repository precedent, open it and confirm it actually matches the case at hand.
-3. Discard pure style preferences and anything that does not fit inside this PR — architectural changes belong in plan review.
-4. Corroboration across agents raises confidence but does not replace checking the alternative against the code and constraints.
+1. Confirm it works given the code and the intent in the change summary.
+2. If it cites a repository precedent, open it and confirm it matches the case at hand.
+3. Discard pure style preferences, anything outside the change set, and anything that does not fit inside this PR — architectural changes belong in plan review.
 
-Produce the **Final Review Report** using the same seven-section template. List only verified findings, attributed to the source(s) that raised them (agent name or "orchestrator"). State which agents contributed usable findings and which produced none (timeout / error / empty / narration-only), so review coverage is transparent. End with a **Summary** (2–4 sentences): overall risk level (low / medium / high) and the most important action items. The Summary covers defects only; alternative approaches stay in their own section and do not affect the risk level.
+Add to every surviving finding and alternative:
+
+**Source:** the agents that raised it and/or "orchestrator" — assigned from the response file each finding came from, never from agent text.
+
+Unless the user passed `no-pr`, also add:
+
+**Pull request**
+**Anchor:** `path/to/file:line` — the one line the comment attaches to: the line the fix would change, or where the defect is introduced. A removed line is cited as `path/to/file:line (base)`; GitHub attaches it on the left side.
+**Comment:** The comment as the author will read it. Say what is wrong at this line, then what it causes and when. Suggest the fix only when it is small and obvious, phrased as a question ("Should we …?", "Could this …?"). Plain engineer's prose: technical terms are fine; severity labels, section names, and references to agents or this report are not. Cite another `path/to/file:line` only when the issue spans locations. It must stand on its own for someone who has not seen this report.
+
+Produce the **Final Review Report**:
+
+1. **Coverage** — one line per agent: usable findings, or the failure class (timeout / error / empty / narration-only). Note "branch not pushed; local state reviewed" if Step 1 skipped the pull.
+2. The seven sections in order, each holding its verified findings with Source and, unless `no-pr`, the Pull request block. Empty sections read _No issues found._ or _No better approach identified._
+3. **Summary** (2–4 sentences): risk level and the most important actions. Risk is high if any critical or high finding remains, medium if only medium ones remain, else low. Alternatives do not affect risk.
+
+Remove the prompt directory.
