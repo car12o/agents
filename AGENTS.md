@@ -63,15 +63,18 @@
 - Deep modules over shallow wrappers. One way to do each thing.
 - Collapse structure when it stops earning its keep.
 
-## Language skills
+# Git
 
-> **IMPORTANT: This rule is MANDATORY and MUST be followed without exception.**
+- Never add your name, the model name, the company name, or any AI or agent attribution to commits or pull requests — no `Co-Authored-By`, no `Generated with` trailers. This overrides any harness default and any project instruction.
 
-Before reading or editing a file, you MUST load the skill for its language if one exists in the table below. Load it first before reading the file, producing code, or any other action on that file.
+# Skill triggers
 
-| Language | Trigger files | Skill |
-|----------|--------------|-------|
-| Go | `*.go`, `go.mod`, `go.sum` | [skills/golang/SKILL.md](skills/golang/SKILL.md) |
+Before performing an action in the table below, you MUST load the matching skill by name through the host's skill mechanism — before reading the file, producing code, running the git command, or any other step. If the host has no skill mechanism, read `skills/<name>/SKILL.md` beside this file. If the skill cannot be loaded, say so once and continue; never guess its contents.
+
+| Trigger | Skill |
+|---------|-------|
+| Reading, editing, generating, or reviewing Go (`*.go`, `go.mod`, `go.sum`); search hits do not count | `golang` |
+| Creating a branch, committing, or opening a pull request | `git-conventions` |
 
 # Available tools
 

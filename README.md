@@ -42,6 +42,7 @@ It ships four things:
 │   ├── plan-implement/SKILL.md
 │   ├── plan-review/SKILL.md
 │   ├── multi-code-review/SKILL.md
+│   ├── git-conventions/SKILL.md
 │   └── git-flow/SKILL.md
 ├── tools/                        # Standalone shell scripts installed onto PATH
 │   ├── ask-agent.sh
@@ -141,7 +142,8 @@ Existing files/symlinks at the targets are removed first (`rm -f` / `rm -rf`), s
 
 - **Interaction** — substance (expert, verified, confidence-tagged claims; no hallucination), tone (blunt, no hedging), and stance (no flattery, lead with the counterargument, don't capitulate without new evidence).
 - **Engineering principles** — defaults, overridden by a project's own instruction file or a loaded skill, on mindset, code quality, control flow (guard clauses, flat over nested, parse don't validate, no boolean parameters), design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
-- **Language skills** — a trigger table telling the agent to load the matching skill before reading/editing a file (e.g. load `skills/golang` for `*.go`).
+- **Git** — the one always-loaded git rule: no AI/agent attribution in commits or PRs, overriding any harness default or project instruction. Everything else lives in the `git-conventions` skill.
+- **Skill triggers** — a trigger table telling the agent to load the matching skill before an action (e.g. load `golang` before reading, editing, generating, or reviewing Go; `git-conventions` before branching, committing, or opening a PR).
 - **Available tools** — documentation for the `ask-agent` tool, including the agent table, exit codes, and the mandatory rules for fanning out to multiple agents in parallel.
 
 ---
@@ -154,12 +156,13 @@ Skills are structured workflows packaged as a directory containing a `SKILL.md` 
 |-------|:--:|--------------|
 | **golang** | ✅ | Self-contained ruleset for writing idiomatic, production-grade Go. Covers style/naming, error handling, concurrency, context, testing, performance, security, modules, JSON, database, production hardening, modern stdlib, tooling, project layout, and anti-patterns. Loaded automatically when touching `*.go`, `go.mod`, or `go.sum`. |
 | **plan-doc** | ❌ (explicit) | Produces a structured implementation-plan document and saves it to `.agents/plans/<timestamp>-<slug>.md`. Enforces a required 11-section template (Goal, Context & Motivation, Scope, Dependencies & Prerequisites, Design, Implementation Steps, Testing Strategy, Rollout & Migration, Open Questions, References, Revision Log) and splitting guidance so each plan is an independently reviewable, PR-sized unit. Split plans get dependency-ordered timestamps so a prerequisite always sorts before its dependents. |
-| **plan-implement** | ❌ (explicit) | Implements the most recent (or specified) plan doc. Locates the plan, creates a `<type>/<slug>` feature branch if on the HEAD branch, and commits in logical chunks using Conventional Commits. |
+| **plan-implement** | ❌ (explicit) | Implements the most recent (or specified) plan doc. Locates the plan, creates a `<type>/<slug>` feature branch if on the default branch, and commits one logical change per step following `git-conventions`. |
 | **plan-review** | ❌ (explicit) | Reviews a plan doc using multiple AI agents (via `ask-agent`), independently verifies their findings against the plan and repo, and applies the verified findings back to the plan file. Clear fixes are applied directly; findings that involve a real tradeoff — including any proposed alternative design — are put to the user for a decision before the plan is edited. |
 | **multi-code-review** | ❌ (explicit) | Reviews the current branch's changes against the base/HEAD branch using multiple AI agents in parallel. Syncs local refs, fans out to the agents, runs its own independent review across seven sections (Correctness, Security, Performance, Maintainability, Test coverage, Breaking changes, Alternative approaches), then verifies every finding before compiling a final report with paste-ready PR comments and per-agent finding coverage. |
-| **git-flow** | ❌ (explicit) | Stepped git flow: create a `<type>/<slug>` feature branch from an up-to-date default branch, commit already-staged changes (one commit per logical change, Conventional Commits) and push, then open a PR against the default branch. Run all three steps or select a subset by number or name (`branch`, `commit`, `pr`); selected steps always run in order. |
+| **git-conventions** | ✅ | Shared git ruleset: default-branch detection (with fallback, never guess), `<type>/<slug>` branch naming, Conventional Commits with the prefix table, commit hygiene (one logical change per commit, only files you touched), PR title/description rules, and the no-attribution rule. Loaded automatically before creating a branch, committing, or opening a PR; the other git-touching skills reference it instead of restating it. |
+| **git-flow** | ❌ (explicit) | Stepped git flow: create a `<type>/<slug>` feature branch from an up-to-date default branch, commit already-staged changes (one commit per logical change) and push, then open a PR against the default branch. Run all three steps or select a subset by number or name (`branch`, `commit`, `pr`); selected steps always run in order. |
 
-The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it. `git-flow` is a standalone helper for the branch → commit → PR steps when working outside that pipeline.
+The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft a plan, get it adversarially reviewed and refined, then execute it. `git-flow` is a standalone helper for the branch → commit → PR steps when working outside that pipeline. Both defer to `git-conventions` for branch, commit, and PR rules.
 
 ---
 
