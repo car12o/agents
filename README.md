@@ -140,7 +140,7 @@ Existing files/symlinks at the targets are removed first (`rm -f` / `rm -rf`), s
 `AGENTS.md` is the shared system-prompt-level instruction set loaded by every agent. `CLAUDE.md` is just a symlink to it, so all three agents read the identical content. It defines:
 
 - **Interaction** — substance (expert, verified, confidence-tagged claims; no hallucination), tone (blunt, no hedging), and stance (no flattery, lead with the counterargument, don't capitulate without new evidence).
-- **Engineering principles** — mandatory rules on mindset, code quality, control flow (guard clauses, flat over nested, parse don't validate, no boolean parameters), design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
+- **Engineering principles** — defaults, overridden by a project's own instruction file or a loaded skill, on mindset, code quality, control flow (guard clauses, flat over nested, parse don't validate, no boolean parameters), design principles (SOLID/DRY/YAGNI/KISS as vocabulary, not dogma), architecture (dependencies point inward, pure core/impure shell), and structure (split by rate of change, colocate by feature).
 - **Language skills** — a trigger table telling the agent to load the matching skill before reading/editing a file (e.g. load `skills/golang` for `*.go`).
 - **Available tools** — documentation for the `ask-agent` tool, including the agent table, exit codes, and the mandatory rules for fanning out to multiple agents in parallel.
 
