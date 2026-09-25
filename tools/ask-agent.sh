@@ -10,7 +10,7 @@
 #   - The response file path is printed on every exit; on failure the file holds whatever the agent produced.
 #   - Exit codes:
 #       0    success
-#       2    bad usage (missing agent, unknown agent, missing/empty prompt file)
+#       2    bad usage (missing agent, unknown agent, missing/empty/oversized prompt file)
 #       124  `timeout` killed the agent (15m cap reached)
 #       *    propagated from the agent CLI
 #
@@ -22,6 +22,7 @@
 set -euo pipefail
 
 readonly TIMEOUT="15m"
+readonly MAX_PROMPT_BYTES=102400
 readonly VALID_AGENTS="claude, codex, glm, minimax, kimi, qwen, deepseek, grok, gemini"
 readonly RULES='⚠️ ⚠️ ⚠️  CRITICAL RULES — YOU MUST OBEY THESE WITHOUT EXCEPTION  ⚠️ ⚠️ ⚠️
 
@@ -52,7 +53,7 @@ Agents:
   grok      xAI Grok (via opencode)
   gemini    Google Gemini (via opencode)
 
-The prompt is read from <prompt-file> and prepended with read-only rules.
+The prompt is read from <prompt-file> (under 100 KB) and prepended with read-only rules.
 The agent call is wrapped in `timeout 15m`.
 The response file path is printed on every exit.
 EOF
@@ -85,6 +86,7 @@ prepare_prompt() {
   [[ -n "$file" ]] || die "missing <prompt-file> argument."
   [[ -f "$file" ]] || die "prompt file not found: $file"
   [[ -s "$file" ]] || die "prompt file is empty: $file"
+  [[ "$(wc -c <"$file")" -le "$MAX_PROMPT_BYTES" ]] || die "prompt file exceeds ${MAX_PROMPT_BYTES} bytes: $file"
   PROMPT_FILE="$file"
 }
 

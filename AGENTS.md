@@ -88,6 +88,8 @@ Runs a one-shot prompt against an LLM agent CLI with a 15-minute timeout. Every 
 ask-agent <agent> <prompt-file>
 ```
 
+The prompt file must be under 100 KB; the script rejects larger files with exit code 2.
+
 ## Agents
 
 | Agent      | Backend                 |
@@ -112,11 +114,11 @@ That stdout line is the API contract. It is not the agent response itself; it is
 
 ## Exit codes
 
-| Code  | Meaning                                                                       |
-|-------|-------------------------------------------------------------------------------|
-| `0`   | Success                                                                       |
-| `2`   | Bad usage: missing or unknown agent; prompt file missing, not found, or empty |
-| `124` | Timeout: the agent was killed after 15 minutes                                |
+| Code  | Meaning                                                                                    |
+|-------|--------------------------------------------------------------------------------------------|
+| `0`   | Success                                                                                    |
+| `2`   | Bad usage: missing or unknown agent; prompt file missing, not found, empty, or over 100 KB |
+| `124` | Timeout: the agent was killed after 15 minutes                                             |
 
 Any other non-zero code is propagated unchanged from the underlying agent CLI.
 
