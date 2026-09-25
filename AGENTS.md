@@ -99,6 +99,7 @@ ask-agent <agent> <prompt-file>
 | `kimi`     | OpenCode, Moonshot Kimi |
 | `qwen`     | OpenCode, Alibaba Qwen  |
 | `deepseek` | OpenCode, DeepSeek      |
+| `grok`     | OpenCode, xAI Grok      |
 | `gemini`   | OpenCode, Google Gemini |
 
 This table is the fan-out list for the review skills: adding or removing a row changes which agents every review asks.

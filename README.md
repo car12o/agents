@@ -63,7 +63,7 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | `make`     | the installer | core requirement |
 | Claude Code (`claude`) | `install-claude`, `ask-agent claude` | reads `~/.claude/CLAUDE.md` and `~/.claude/skills` |
 | Codex (`codex`) | `install-codex`, `ask-agent codex` | reads `~/.codex/AGENTS.md` and `~/.codex/skills` |
-| OpenCode (`opencode`) | `install-opencode`, `ask-agent glm/minimax/kimi/qwen/deepseek/gemini` | reads `~/.config/opencode` |
+| OpenCode (`opencode`) | `install-opencode`, `ask-agent glm/minimax/kimi/qwen/deepseek/grok/gemini` | reads `~/.config/opencode` |
 | `jq` | `agents-mcp`, statusline | JSON parsing / TOML generation |
 | `perl` | `ask-agent` | strips `<think>…</think>` blocks from responses |
 | `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` and `playwright` MCP servers |
@@ -185,13 +185,14 @@ ask-agent <agent> <prompt-file>
 | Agent | Backend | Underlying command |
 |-------|---------|--------------------|
 | `claude` | Anthropic Claude Code | `claude -p --model claude-opus-4-8 --effort xhigh` |
-| `codex` | OpenAI Codex | `codex exec --model gpt-6-astra --skip-git-repo-check` |
+| `codex` | OpenAI Codex | `codex exec --model gpt-5.6-sol` |
 | `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.3 --variant max` |
 | `minimax` | MiniMax (via OpenCode) | `opencode run --model …/minimax-m3-coder` |
 | `kimi` | Moonshot Kimi (via OpenCode) | `opencode run --model …/k3 --variant max` |
 | `qwen` | Alibaba Qwen (via OpenCode) | `opencode run --model …/qwen3.8-max` |
-| `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4-pro --variant max` |
-| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.7-flash --variant high` |
+| `deepseek` | DeepSeek (via OpenCode) | `opencode run --model …/deepseek-v4.1-flash --variant max` |
+| `grok` | xAI Grok (via OpenCode) | `opencode run --model …/grok-4.7 --variant xhigh` |
+| `gemini` | Google Gemini (via OpenCode) | `opencode run --model github-copilot/gemini-3.8-flash --variant high` |
 
 This is the engine behind the `plan-review` and `multi-code-review` skills, which fan out to several of these agents in parallel and cross-check their findings.
 
