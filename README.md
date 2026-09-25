@@ -36,7 +36,7 @@ It ships four things:
 ├── AGENTS.md                     # Shared agent instructions (single source of truth)
 ├── CLAUDE.md                     # Symlink → AGENTS.md (so Claude Code picks up the same file)
 ├── Makefile                      # install / uninstall targets for all agents + tools
-├── skills/                       # Reusable agent workflows (one dir per skill)
+├── skills/                       # Reusable agent workflows (one dir per skill; manual-only ones also carry agents/openai.yaml)
 │   ├── golang/SKILL.md
 │   ├── plan-doc/SKILL.md
 │   ├── plan-implement/SKILL.md
@@ -150,7 +150,7 @@ Existing files/symlinks at the targets are removed first (`rm -f` / `rm -rf`), s
 
 ## Skills
 
-Skills are structured workflows packaged as a directory containing a `SKILL.md` with YAML frontmatter (`name`, `description`, and optionally `disable-model-invocation`). They are installed into each agent's `skills/` directory. Skills with `disable-model-invocation: true` are **not** auto-triggered by the model — they're meant to be invoked explicitly (e.g. as a slash command).
+Skills are structured workflows packaged as a directory containing a `SKILL.md` with YAML frontmatter (`name`, `description`, and optionally the manual-only switches below). They are installed into each agent's `skills/` directory. A manual-only skill is invoked explicitly (e.g. as a slash command) and never auto-triggered by the model. Each runtime has its own switch, so manual-only skills carry both: `disable-model-invocation: true` in the frontmatter for Claude Code, and an `agents/openai.yaml` with `policy.allow_implicit_invocation: false` for Codex. OpenCode has no equivalent switch.
 
 | Skill | Auto-invokable | What it does |
 |-------|:--:|--------------|
