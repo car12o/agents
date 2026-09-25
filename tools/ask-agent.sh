@@ -7,6 +7,7 @@
 # Behavior:
 #   - Prompt is read from the file at <prompt-file> and prepended with read-only, no-delegation rules.
 #   - Underlying agent call is wrapped in `timeout 15m`.
+#   - The response file path is printed on every exit; on failure the file holds whatever the agent produced.
 #   - Exit codes:
 #       0    success
 #       2    bad usage (missing agent, unknown agent, missing/empty prompt file)
@@ -53,6 +54,7 @@ Agents:
 
 The prompt is read from <prompt-file> and prepended with read-only rules.
 The agent call is wrapped in `timeout 15m`.
+The response file path is printed on every exit.
 EOF
 }
 
@@ -92,13 +94,15 @@ strip_thinking() {
   perl -0777 -pe 's/<think>.*?<\/think>\n?//gs; s/\A.*?(?<!`)<\/think>\n?//s'
 }
 
+# Prints the response file path on every exit so a partial response survives a timeout or CLI failure.
 run_agent() {
   local agent="$1"
-  local out
+  local out status=0
   out="$(mktemp -t "${agent}-output.XXXXXX")"
   timeout "$TIMEOUT" "${CMD[@]}" "$(echo "$RULES" && cat "$PROMPT_FILE")" \
-    | strip_thinking >"$out"
+    | strip_thinking >"$out" || status=$?
   echo "$out"
+  return "$status"
 }
 
 main() {

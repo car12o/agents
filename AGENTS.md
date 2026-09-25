@@ -106,9 +106,9 @@ This table is the fan-out list for the review skills: adding or removing a row c
 
 ## Output
 
-On success, the script prints a single line to stdout: the path to a temp file containing the agent's response (e.g. `/tmp/claude-output.XXXXXX`).
+On every exit, the script prints a single line to stdout: the path to a temp file containing the agent's response (e.g. `/tmp/claude-output.XXXXXX`).
 
-That stdout line is the API contract. It is not the agent response itself; it is the file path you must read after the process completes.
+That stdout line is the API contract. It is not the agent response itself; it is the file path you must read after the process completes. On a non-zero exit the file holds whatever the agent produced before failing; the exit code says whether the response is complete.
 
 ## Exit codes
 
@@ -125,4 +125,4 @@ Any other non-zero code is propagated unchanged from the underlying agent CLI.
 1. **Write the prompt to a temp file first**, then pass the path as `<prompt-file>`. When several agents get the same question, pass them the same file.
 2. **Do not redirect the script's stdout to a file.** Its single printed line is the response-file path, not the response.
 3. **Independent calls run in parallel.** One direct `ask-agent <agent> <prompt-file>` invocation per agent through the host's parallel tool mechanism, never chained or serialized. If the host has none, background each call with `&` from one shell and `wait` once. Run calls sequentially only when a prompt depends on an earlier response.
-4. **After each call completes, read the file at the printed path.**
+4. **After each call completes, read the file at the printed path.** Check the exit code first; a non-zero exit means the response is partial or absent.
