@@ -10,13 +10,14 @@ Review a plan doc using multiple AI agents, then apply verified findings directl
 
 ## Step 1 — Locate the plan
 
-If the user provided a path, use it. Otherwise, find the most recent plan:
+If the user provided a path, use it. Otherwise, find the most recently touched plan under the repository root:
 
 ```bash
-ls -t .agents/plans/*.md | head -1
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+ls -t "$root"/.agents/plans/*.md | head -1
 ```
 
-If no plan exists, stop and tell the user.
+If no plan exists, stop and tell the user. A plan whose `Depends on` line names other plans is one of a split set; tell the user which siblings exist so they can review each one.
 
 ## Step 2 — Write the prompt file
 
@@ -31,7 +32,7 @@ Read that file first. The repository is checked out locally — read any referen
 
 Each finding must use this format exactly:
 
-**Section:** Goal | Design | Steps | Testing | Scope | Dependencies | Open Questions
+**Section:** Goal | Design | Steps | Testing | Scope | Dependencies | Rollout | Open Questions
 **Severity:** blocking | major | minor
 **Issue:** One-line description of the problem
 **Recommendation:** Concrete suggestion, or "unclear"
@@ -54,12 +55,17 @@ Report any materially better design for the same goals — simpler, more robust,
 <findings>
 
 ## Implementation feasibility
-Check for: missing steps, wrong sequencing, unrealistic size estimates, steps that cannot be independently reviewed.
+Check for: missing steps, wrong sequencing, unrealistic size estimates, steps larger than M (one day), steps without a verification condition, steps that cannot be independently reviewed.
 
 <findings>
 
 ## Dependencies & risks
-Check for: undeclared external dependencies, missing sign-off requirements, unacknowledged risks, circular dependencies.
+Check for: undeclared external dependencies, missing sign-off requirements, unacknowledged risks, risks without a mitigation, unverified assumptions, circular dependencies.
+
+<findings>
+
+## Rollout & migration
+Check for: no rollback plan, irreversible migrations without a downtime assessment, no observability signal that shows the rollout succeeded; for non-deployed code, no versioning strategy or breaking-change communication.
 
 <findings>
 
@@ -69,12 +75,12 @@ Check for: untestable success criteria, missing edge cases, no integration or ro
 <findings>
 
 ## Scope definition
-Check for: fuzzy in/out-of-scope boundary, plan too large to be independently executable (>10 steps or >2 major subsystems without a split), scope creep.
+Check for: fuzzy in/out-of-scope boundary, plan too large for a standalone PR (more than 10 steps, or more than two separately built, deployed, or owned components, without a split), scope creep.
 
 <findings>
 
 ## Open questions
-Check for: unresolved blockers that should block execution, questions missing owner or due date, questions that should already be answered at this stage.
+Check for: unresolved questions marked Blocking, questions that block execution but are not marked Blocking, questions missing owner or due date, questions that should already be answered at this stage.
 
 <findings>
 

@@ -1,112 +1,102 @@
 ---
 name: plan-doc
-description: Produce a structured implementation plan document and save it to disk. Use when asked to write, create, or generate an implementation plan, design doc, or technical spec for a feature or change.
+description: Produce a structured implementation plan document and save it to disk. Use when asked to write, create, or generate an implementation plan for a feature or change.
 disable-model-invocation: true
 ---
 
 # Skill: plan-doc
 
-Produce a structured implementation plan document and save it to disk.
-
 ## Behavior
 
-1. **Gather minimum required context before writing.** You need at minimum: (a) what is being built, (b) why it matters now. Ask only for these blockers; capture everything else as assumptions or Open Questions. Do not ask about non-blocking details.
-2. **Derive the slug** from the plan's subject: lowercase ASCII, strip punctuation, collapse whitespace to single hyphens, ≤ 5 words (e.g. `auth-token-refresh`). If no clear subject exists, ask the user.
-3. **Compute the timestamp(s).** Capture one base epoch: `base=$(date +%s)`. A single plan uses `date -d "@$base" +%Y%m%d%H%M%S` (YYYYMMDDHHMMSS). When writing multiple plans (see Splitting), order them so every prerequisite precedes its dependents, then give the k-th plan (k = 0, 1, 2, …) the timestamp `date -d "@$((base + k))" +%Y%m%d%H%M%S`. This guarantees a prerequisite's filename sorts before anything depending on it.
-4. **Write the plan** to `.agents/plans/<YYYYMMDDHHMMSS>-<slug>.md` relative to the working directory. Use `mkdir -p` to create the full path. Before writing, check whether the target path already exists; if it does, increment a numeric suffix (`<YYYYMMDDHHMMSS>-<slug>-2.md`, `-3.md`, …) until an unused filename is found.
-
-**Splitting guidance:** Each plan must be an independently executable and reviewable unit of work — something that could be opened, reviewed, and merged as a standalone PR. Split when: the plan has more than ~10 implementation steps, it spans more than two major subsystems, or any section of it cannot be completed without first shipping a different section. When splitting, link the resulting plans to each other via References, note the execution order in Dependencies & Prerequisites, and assign timestamps in that order (step 3).
+1. **Gather context.** You need two answers from the user: what is being built, and why it matters now. Ask only when one is missing; if the user cannot answer, stop and report what is missing. Then read the code, tests, and docs the change touches and cite their paths in the plan. Record every other unknown as an Assumption or an Open Question.
+2. **Decide whether to split.** Each plan must be mergeable as a standalone PR. Split when the plan has more than 10 implementation steps, spans more than two separately built, deployed, or owned components, or contains work that cannot start until another part has shipped. Order the plans so every prerequisite precedes its dependents; each plan names its prerequisites in `Depends on` and its siblings in References.
+3. **Derive type and slug.** Type is the `git-conventions` commit prefix of the plan's dominant change: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore`; ask when it is not obvious. Slug: lowercase the subject, replace every run of characters outside `[a-z0-9]` with one hyphen, trim hyphens, keep the first five words; ask if the result is empty. Each split plan gets its own slug.
+4. **Name the file.** Plans live in `<root>/.agents/plans/`, where `<root>` is `git rev-parse --show-toplevel`, or the working directory outside a git repository. A single plan is `$(date -u +%Y%m%d%H%M%S)-<slug>.md`. A split set shares one timestamp and adds a two-digit sequence in execution order: `<timestamp>-01-<slug>.md`, `<timestamp>-02-<slug>.md`, ….
+5. **Write the plan.** Run `mkdir -p <root>/.agents/plans`, then fill the template below. Its prompts are instructions to you: replace them with content and never copy them into the plan.
+6. **Report.** List each written path with a one-line summary, in execution order, and name `plan-review` as the next step. Do not reproduce plan content in chat.
 
 ## Plan Template
 
-All top-level sections are required. When a section genuinely does not apply, keep its heading and write `Not applicable — <one-line reason>` beneath it. Within section 5 (Design), **Overview** and **Key decisions** are required; **Interfaces & signatures**, **Transport / payload shapes**, and **Schema & query skeletons** are optional — omitting them requires no explanation.
+All numbered sections are required. When one genuinely does not apply, keep its heading and write `Not applicable — <one-line reason>`. For non-deployed code (libraries, CLIs), section 8 describes the versioning strategy and how breaking changes are communicated.
 
-Examples: "Omit Transport for internal-only changes." "Omit Schema for non-persistent features." "Rollout: Not applicable — library release, no deployment step."
+In section 5, Overview and Key decisions are required. The three code subsections are optional; delete the heading of any you omit, no explanation needed:
+
+- **Interfaces & signatures** — only for public APIs, exported functions, RPC methods, or CLI commands.
+- **Transport / payload shapes** — only at HTTP, gRPC, CLI, message-queue, or IPC boundaries.
+- **Schema & query skeletons** — only when a database schema or a significant query is introduced.
+
+Code appears only inside those three subsections and shows minimal external contracts or structural skeletons, never full implementations.
+
+In section 6, no step is larger than M; decompose anything bigger. In section 9, Blocking is `yes` or `no` and Resolution stays blank until the question is resolved.
 
 ---
 
 ````markdown
 # <Title>
 
-**Date:** YYYY-MM-DD
+**Type:** <feat | fix | refactor | docs | test | chore>
 **Slug:** <slug>
+**Date:** <date of the filename timestamp, YYYY-MM-DD>
+**Depends on:** <relative paths of prerequisite plans, or none>
 
 ---
 
 ## 1. Goal
 
-One paragraph. What are we building and why does it matter now?
+One paragraph: what is being built and why it matters now.
 
 **Success criteria:**
-- Bullet list of measurable outcomes that define "done."
-- How will we know this succeeded?
+- Measurable outcomes that define "done".
 
 ## 2. Context & Motivation
 
-- What problem does this solve?
-- Why is the current approach insufficient?
-- Relevant prior art, ADRs, or linked issues.
+- What problem does this solve, and why is the current approach insufficient?
+- Prior art that motivates the design, cited by name; links go in References.
+
+**Assumptions:**
+- Claims this plan relies on that were not confirmed.
 
 ## 3. Scope
 
 ### In scope
-- Bullet list of what this plan covers.
+- What this plan covers.
 
 ### Out of scope
-- Bullet list of explicitly excluded work.
+- Explicitly excluded work.
 
-## 4. Dependencies & Prerequisites
+## 4. Dependencies & Risks
 
-- Other plans or PRs this work depends on.
+- PRs or other work this plan depends on; sibling plans are listed in Depends on.
 - External systems, services, or credentials required.
 - Teams or people whose sign-off or output is needed before this can proceed.
+- Known risks and their mitigations.
 
 ## 5. Design
 
 ### Overview
-Prose description of the approach. One to three paragraphs max.
+Prose description of the approach, one to three paragraphs.
 
 ### Key decisions
-| Decision | Chosen approach | Alternatives considered |
-|----------|-----------------|-------------------------|
-| ...      | ...             | ...                     |
+| Decision | Chosen approach | Alternatives considered | Why rejected |
+|----------|-----------------|-------------------------|--------------|
 
 ### Interfaces & signatures
-<!-- Include ONLY for public APIs, exported functions, RPC methods, CLI commands.
-     Omit for internal helpers. Snippets must show external contracts only, not full implementations. -->
-
-```<lang>
-// Example: exported function signature or interface definition
-```
 
 ### Transport / payload shapes
-<!-- Include ONLY for HTTP, gRPC, CLI, message-queue, or IPC boundaries.
-     Show the schema or a representative example payload. -->
-
-```json
-// Example: request/response shape or protobuf-equivalent
-```
 
 ### Schema & query skeletons
-<!-- Include ONLY when a database schema or significant query is introduced.
-     Show CREATE TABLE / migration skeleton or the query pattern, not full ORM boilerplate. -->
-
-```sql
--- Example: table definition or query skeleton
-```
 
 ## 6. Implementation Steps
 
-Ordered list. Each step should be independently reviewable.
+Ordered list; each step is one independently reviewable change.
 
-1. **Step title** — one-sentence description. Estimated size: XS (<1 hr) / S (<4 hr) / M (<1 day) / L (<1 week).
-2. ...
+1. **Step title** — one-sentence description. Verify: how to confirm the step is done. Size: XS (<1 hr) / S (<4 hr) / M (<1 day).
 
 ## 7. Testing Strategy
 
 - Unit: what to unit-test and why.
 - Integration: what requires a real dependency (DB, network, etc.).
-- Edge cases: list the non-obvious scenarios that must be covered.
+- Edge cases: the non-obvious scenarios that must be covered.
 - What is explicitly not tested and why.
 
 ## 8. Rollout & Migration
@@ -114,27 +104,18 @@ Ordered list. Each step should be independently reviewable.
 - Feature flags, dark launches, or staged rollouts required.
 - Data migrations: reversible? downtime risk?
 - Rollback plan.
-- Success criteria / observability: how do you know the rollout succeeded? Logs, metrics, alerts, or dashboards to monitor.
-
-> For non-deployed code (libraries, CLIs): describe the versioning strategy and how breaking changes will be communicated instead.
+- Observability: logs, metrics, alerts, or dashboards that show the rollout succeeded.
 
 ## 9. Open Questions
 
-| # | Question | Owner | Due | Resolution |
-|---|----------|-------|-----|------------|
-| 1 | ...      | ...   | ... | ...        |
+| # | Question | Blocking | Owner | Due | Resolution |
+|---|----------|----------|-------|-----|------------|
 
 ## 10. References
 
-- Links to relevant issues, PRs, docs, RFCs, ADRs, or related plans.
+- Links to relevant issues, PRs, docs, RFCs, ADRs, and sibling plans by relative path.
 
 ## 11. Revision Log
 
 - YYYY-MM-DD: Initial draft.
 ````
-
----
-
-## Code-snippet rules
-
-Only include code in subsections of section 5 (Interfaces & signatures, Transport / payload shapes, Schema & query skeletons). Do **not** add code snippets to Goal, Context, Dependencies, Steps, Testing, or Rollout. Snippets must show minimal external contracts or structural skeletons — not full implementations.

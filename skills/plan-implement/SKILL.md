@@ -10,19 +10,23 @@ Implement the plan doc and commit changes in logical chunks with clear messages.
 
 ## Step 1 — Locate the plan
 
-If the user provided a path, use it. Otherwise, find the most recent plan:
+If the user provided a path, use it. Otherwise, find the most recently touched plan under the repository root:
 
 ```bash
-ls -t .agents/plans/*.md | head -1
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+ls -t "$root"/.agents/plans/*.md | head -1
 ```
 
 If no plan exists, stop and tell the user.
 
-Read the plan file in full before writing any code.
+Read the plan file in full before writing any code. Then check two gates before touching anything:
+
+- If `Depends on` names other plans, ask the user to confirm each one is merged. Wait for the answer.
+- If any Open Question is marked Blocking and has no Resolution, stop and report it.
 
 ## Step 2 — Prepare the branch
 
-Load the `git-conventions` skill. If the current branch (`git rev-parse --abbrev-ref HEAD`) is `<default>`, create and switch to a feature branch before touching any files, named `<type>/<slug>` from the plan's type and slug.
+Load the `git-conventions` skill. If the current branch (`git rev-parse --abbrev-ref HEAD`) is `<default>`, create and switch to a feature branch before touching any files, named `<type>/<slug>` from the plan's `Type` and `Slug` header lines.
 
 If the derived branch name already exists, do not check it out silently. Instead, present the user with 3–5 alternative names derived from the plan slug and type (e.g. append a short qualifier, increment a suffix, use a synonym), and ask them to pick one or provide their own. Wait for their answer before creating the branch.
 
@@ -32,7 +36,7 @@ Work through the plan's **Implementation Steps** in order. For each step:
 
 1. Read any files you need to understand before editing.
 2. Make the changes described by the step.
-3. Verify correctness — run tests, type-check, or lint as appropriate for the language and project.
+3. Verify correctness — check the step's `Verify` condition, and run tests, type-check, or lint as appropriate for the language and project.
 4. Commit the change per `git-conventions`.
 
 Combine tightly related steps into a single commit only when they form one indivisible change; split a step across several commits when it contains distinct logical changes. Never commit the plan doc itself (`.agents/plans/…`).
