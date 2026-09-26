@@ -27,7 +27,7 @@ In section 5, Overview and Key decisions are required. The three code subsection
 
 Code appears only inside those three subsections and shows minimal external contracts or structural skeletons, never full implementations.
 
-In section 6, no step is larger than M; decompose anything bigger. In section 9, Blocking is `yes` or `no` and Resolution stays blank until the question is resolved.
+In section 6, no step is larger than M; decompose anything bigger. Section 6 schedules all the work: every test section 7 names and every code-level item in section 8 (migrations, flags, rollback hooks) belongs to the step that introduces the behaviour it covers, because plan-implement executes steps, not prose. In section 9, Blocking is `yes` or `no` and Resolution stays blank until the question is resolved.
 
 ---
 
@@ -37,7 +37,7 @@ In section 6, no step is larger than M; decompose anything bigger. In section 9,
 **Type:** <feat | fix | refactor | docs | test | chore>
 **Slug:** <slug>
 **Date:** <date of the filename timestamp, YYYY-MM-DD>
-**Depends on:** <relative paths of prerequisite plans, or none>
+**Depends on:** <filenames of prerequisite plans in this directory, or none>
 
 ---
 
@@ -113,7 +113,7 @@ Ordered list; each step is one independently reviewable change.
 
 ## 10. References
 
-- Links to relevant issues, PRs, docs, RFCs, ADRs, and sibling plans by relative path.
+- Links to relevant issues, PRs, docs, RFCs, ADRs, and sibling plans by filename.
 
 ## 11. Revision Log
 
