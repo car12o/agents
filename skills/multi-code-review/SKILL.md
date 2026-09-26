@@ -6,9 +6,9 @@ disable-model-invocation: true
 
 # Skill: multi-code-review
 
-Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it.
+Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it. Load `review-fanout`; it governs the prompt file, launch, failure handling, your own review, merging, and coverage.
 
-> **Important:** agents have full access to the repository and investigate the changes themselves. The prompt file carries only what they cannot fetch: the change summary, the changed-file paths, and PR intent and discussion. Never paste diff hunks or file contents into it.
+> **Important:** the prompt file carries only what agents cannot fetch: the change summary, the changed-file paths, and PR intent and discussion. Never paste diff hunks or file contents into it.
 
 ## Step 1 — Check preconditions and pin the change set
 
@@ -39,9 +39,7 @@ Then gather context for the change summary in Step 2 — the raw output never go
 
 ## Step 2 — Write the prompt file
 
-Create a private directory with `mktemp -d` and write the prompt to `<dir>/prompt.md`. The directory is created atomically and the file inside does not exist yet, so the write tool can create it. Remove the directory once the report is done.
-
-Write the block below, substituting `<summary>`, `<changed files>`, `<branch>`, `<base>`, `<merge-base>`, and `<head>` with the values from Step 1. Leave everything else unchanged; agents write their findings where `<findings>` appears.
+Write the block below to the prompt file per `review-fanout`, substituting `<summary>`, `<changed files>`, `<branch>`, `<base>`, `<merge-base>`, and `<head>` with the values from Step 1. Leave everything else unchanged; agents write their findings where `<findings>` appears.
 
 ```
 ## Change summary
@@ -121,43 +119,30 @@ If none: _No better approach identified._
 
 ## Step 3 — Run agents and review in parallel
 
-> **IMPORTANT:** If the user has not specified which agents to use, ask all agents listed in the `Ask agent` tool. Do not skip any.
-
-> **IMPORTANT:** Launch all agents simultaneously with the orchestrator's native parallel/background mechanism, one call per agent, then begin your own review while they run. Follow the `Ask agent` rules — no exceptions.
-
-> **NOTE:** Do not fetch, pull, or otherwise mutate branches from here on.
-
-Record each agent's exit code and stdout. Every exit prints one line: the response file path. Exit 0 means the response is complete; 124 is a timeout, 2 a usage error, anything else a CLI error, and the file holds whatever the agent produced before failing; stderr says why. A failed agent is not fatal; continue with the others.
+Launch the agents per `review-fanout`, then review while they run. Do not fetch, pull, or otherwise mutate branches from here on.
 
 **Your review (while agents run):**
 
 1. Review file by file, in `--name-status` order: `git diff <merge-base> <head> -- <path>`, so a large change set is never truncated. For a removed file, read `git show <merge-base>:<path>`.
 2. Read the surrounding context of each hunk, not just the hunk.
-3. Apply the same seven sections and formats as the agents.
-4. Record your findings separately — do not merge with agent output yet.
 
-Do not start Step 4 until every agent job has returned; a failed agent counts as returned. Then read each response file.
+When every call has returned, read and classify the response files per `review-fanout`.
 
 ## Step 4 — Verify and compile
 
-Do not take findings at face value — agent or your own. For every finding:
+Verify and merge every finding per `review-fanout`. For this review, verification also means:
 
-1. Open every `path/to/file:line` cited in Evidence. If the cited code sits a few lines away, correct the citation. Discard the finding if the code does not exist or does not say what the finding claims.
+1. If the code cited in Evidence sits a few lines away, correct the citation.
 2. Confirm the change set introduces the defect: the cited lines are added, changed, or removed by `git diff <merge-base> <head>`. Discard findings about code the change set does not touch.
 3. Check Impact and Fix against the code: the trigger is real, the consequence follows, the fix applies. Correct or drop what does not hold.
-4. When several sources report the same defect, write one canonical finding: one severity, the strongest Evidence, the fix that holds, every source listed. When sources contradict each other, the cited code decides; if the finding survives, note the disagreement.
 
-For every alternative approach, apply steps 1 and 4, then:
+For every alternative approach, after the same verification and merge:
 
 1. Confirm it works given the code and the intent in the change summary.
 2. If it cites a repository precedent, open it and confirm it matches the case at hand.
 3. Discard pure style preferences, anything outside the change set, and anything that does not fit inside this PR — architectural changes belong in plan review.
 
-Add to every surviving finding and alternative:
-
-**Source:** the agents that raised it and/or "orchestrator" — assigned from the response file each finding came from, never from agent text.
-
-Unless the user passed `no-pr`, also add:
+Unless the user passed `no-pr`, add to every surviving finding and alternative:
 
 **Pull request**
 **Anchor:** `path/to/file:line` — the one line the comment attaches to: the line the fix would change, or where the defect is introduced. A removed line is cited as `path/to/file:line (base)`; GitHub attaches it on the left side.
@@ -165,8 +150,6 @@ Unless the user passed `no-pr`, also add:
 
 Produce the **Final Review Report**:
 
-1. **Coverage** — one line per agent: usable findings, or the failure class (timeout / error / empty / narration-only). Note "branch not pushed; local state reviewed" if Step 1 skipped the pull.
+1. **Coverage** per `review-fanout`, plus "branch not pushed; local state reviewed" if Step 1 skipped the pull.
 2. The seven sections in order, each holding its verified findings with Source and, unless `no-pr`, the Pull request block. Empty sections read _No issues found._ or _No better approach identified._
 3. **Summary** (2–4 sentences): risk level and the most important actions. Risk is high if any critical or high finding remains, medium if only medium ones remain, else low. Alternatives do not affect risk.
-
-Remove the prompt directory.
