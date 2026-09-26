@@ -6,9 +6,9 @@ disable-model-invocation: true
 
 # Skill: multi-code-review
 
-Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it. Load `review-fanout`; it governs the prompt file, launch, failure handling, your own review, merging, and coverage.
+Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
 
-> **Important:** the prompt file carries only what agents cannot fetch: the change summary, the changed-file paths, and PR intent and discussion. Never paste diff hunks or file contents into it.
+> **Important:** the prompt file carries only the change summary, the changed-file paths, and PR intent and discussion.
 
 ## Step 1 — Check preconditions and pin the change set
 
@@ -126,17 +126,17 @@ Launch the agents per `review-fanout`, then review while they run. Do not fetch,
 1. Review file by file, in `--name-status` order: `git diff <merge-base> <head> -- <path>`, so a large change set is never truncated. For a removed file, read `git show <merge-base>:<path>`.
 2. Read the surrounding context of each hunk, not just the hunk.
 
-When every call has returned, read and classify the response files per `review-fanout`.
+Then collect per `review-fanout`.
 
 ## Step 4 — Verify and compile
 
 Verify and merge every finding per `review-fanout`. For this review, verification also means:
 
-1. If the code cited in Evidence sits a few lines away, correct the citation.
+1. Open a `(base)` citation with `git show <merge-base>:<path>`.
 2. Confirm the change set introduces the defect: the cited lines are added, changed, or removed by `git diff <merge-base> <head>`. Discard findings about code the change set does not touch.
 3. Check Impact and Fix against the code: the trigger is real, the consequence follows, the fix applies. Correct or drop what does not hold.
 
-For every alternative approach, after the same verification and merge:
+For every alternative approach, after `review-fanout`'s verification and merge:
 
 1. Confirm it works given the code and the intent in the change summary.
 2. If it cites a repository precedent, open it and confirm it matches the case at hand.

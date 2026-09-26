@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Skill: plan-review
 
-Review a plan with multiple AI agents, verify and merge their findings with your own, put every real tradeoff to the user, then apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, launch, failure handling, your own review, merging, and coverage.
+Review a plan with multiple AI agents, verify and merge their findings with your own, put every real tradeoff to the user, then apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
 
 ## Step 1 — Locate the plan
 
@@ -35,7 +35,7 @@ A file without the plan-doc header is not a plan: stop and tell the user. Record
 
 ## Step 3 — Write the prompt file
 
-Write the block below to the prompt file per `review-fanout`, filling the placeholders and deleting the two optional lines when they do not apply. Never copy plan content into it.
+Write the block below to the prompt file per `review-fanout`, filling the placeholders and deleting the two optional lines when they do not apply.
 
 ```
 Plans under review, in execution order:
@@ -121,11 +121,11 @@ For several plans only. Check for: execution order contradicting Depends on, sib
 
 ## Step 4 — Run agents and review
 
-Launch the agents per `review-fanout`, then review the plans yourself while they run: the same sections, checks, and format, reading the files the plans reference. When every call has returned, read and classify the response files.
+Launch the agents per `review-fanout`, then review the plans yourself while they run, reading the files the plans reference. Then collect per `review-fanout`.
 
 ## Step 5 — Verify and categorize
 
-Verify and merge every finding per `review-fanout`: re-read the quoted plan text, open every cited file, and drop what the plan and repository do not support. For an omission, confirm the plan covers it nowhere. Drop findings that demand what the template permits.
+Verify and merge every finding per `review-fanout`. For this review, verification also means dropping findings that demand what the template permits.
 
 Categorize each surviving finding:
 
@@ -136,8 +136,9 @@ Categorize each surviving finding:
 
 If any finding is decision required, stop before editing and send one message:
 
-1. The decisions, numbered D1, D2, …: the plan text quoted, the finding and why it needs a decision, the options with their tradeoffs, and your recommendation with its reason.
-2. The clear fixes about to be applied, one line each, so the user can veto any.
+1. Coverage, per `review-fanout`.
+2. The decisions, numbered D1, D2, …: the plan text quoted, the finding with its Source and why it needs a decision, the options with their tradeoffs, and your recommendation with its reason.
+3. The clear fixes about to be applied, one line each, so the user can veto any.
 
 Wait for the answers, then apply only what was answered and not vetoed. A decision the user defers stays out of the plan body and becomes a row in section 9: Blocking `yes` if a step depends on it, Resolution blank. With no decision-required findings, go straight to Step 7.
 
