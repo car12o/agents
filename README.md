@@ -181,7 +181,8 @@ ask-agent <agent> <prompt-file>
 ```
 
 - The prompt is read from `<prompt-file>`. The script prepends critical rules forcing the agent into read-only mode and forbidding it from delegating to other agents.
-- On every exit it prints **a single line to stdout: the path to a temp file** containing the agent's response (`<think>…</think>` blocks are stripped). That path — not the response — is the API contract; read the file after the process completes. On a non-zero exit the file holds whatever the agent produced before failing.
+- Once the prompt is accepted it prints **a single line to stdout: the path to a temp file** containing the agent's response (`<think>…</think>` blocks are stripped). That path — not the response — is the API contract; read the file after the process completes. On a non-zero exit the file holds whatever the agent produced before failing. A usage error prints nothing on stdout.
+- `ask-agent --list` prints the agent names, one per line.
 - **Exit codes:** `0` success · `2` bad usage (missing/unknown agent; prompt file missing, empty, or over 100 KB) · `124` 15-minute timeout reached · any other code propagated from the underlying CLI.
 
 | Agent | Backend | Underlying command |

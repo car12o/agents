@@ -88,7 +88,7 @@ Runs a one-shot prompt against an LLM agent CLI with a 15-minute timeout. Every 
 ask-agent <agent> <prompt-file>
 ```
 
-The prompt file must be under 100 KB; the script rejects larger files with exit code 2.
+The prompt file must be 100 KB or less; the script rejects larger files with exit code 2.
 
 ## Agents
 
@@ -104,11 +104,11 @@ The prompt file must be under 100 KB; the script rejects larger files with exit 
 | `grok`     | OpenCode, xAI Grok      |
 | `gemini`   | OpenCode, Google Gemini |
 
-This table is the fan-out list for the review skills: adding or removing a row changes which agents every review asks.
+This table is the fan-out list for the review skills: adding or removing a row changes which agents every review asks. `ask-agent --list` prints it, one name per line.
 
 ## Output
 
-On every exit, the script prints a single line to stdout: the path to a temp file containing the agent's response (e.g. `/tmp/claude-output.XXXXXX`).
+Once the prompt is accepted, the script prints a single line to stdout on every exit: the path to a temp file containing the agent's response (e.g. `/tmp/claude-output.XXXXXX`). A usage error (exit 2) prints nothing on stdout; the cause is on stderr.
 
 That stdout line is the API contract. It is not the agent response itself; it is the file path you must read after the process completes. On a non-zero exit the file holds whatever the agent produced before failing; the exit code says whether the response is complete.
 
@@ -117,7 +117,7 @@ That stdout line is the API contract. It is not the agent response itself; it is
 | Code  | Meaning                                                                                    |
 |-------|--------------------------------------------------------------------------------------------|
 | `0`   | Success                                                                                    |
-| `2`   | Bad usage: missing or unknown agent; prompt file missing, not found, empty, or over 100 KB |
+| `2`   | Bad usage: unknown agent, or prompt file missing, empty, or over 100 KB. No response file  |
 | `124` | Timeout: the agent was killed after 15 minutes                                             |
 
 Any other non-zero code is propagated unchanged from the underlying agent CLI.
@@ -126,5 +126,5 @@ Any other non-zero code is propagated unchanged from the underlying agent CLI.
 
 1. **Write the prompt to a temp file first**, then pass the path as `<prompt-file>`. When several agents get the same question, pass them the same file.
 2. **Do not redirect the script's stdout to a file.** Its single printed line is the response-file path, not the response.
-3. **Independent calls run in parallel.** One direct `ask-agent <agent> <prompt-file>` invocation per agent through the host's parallel tool mechanism, never chained or serialized. If the host has none, background each call with `&` from one shell and `wait` once. Run calls sequentially only when a prompt depends on an earlier response.
+3. **Independent calls run in parallel, in the background.** One direct `ask-agent <agent> <prompt-file>` invocation per agent through the host's background mechanism, never chained or serialized: a foreground call is subject to the host's own timeout, which can be shorter than the 15 minutes a call may take. If the host has no background mode, run one shell call with its timeout at the maximum, `(ask-agent <agent> <prompt-file>; echo "<agent> exit $?") &` per agent then `wait`; a bare `wait` discards the exit codes. Run calls sequentially only when a prompt depends on an earlier response.
 4. **After each call completes, read the file at the printed path.** Check the exit code first; a non-zero exit means the response is partial or absent.

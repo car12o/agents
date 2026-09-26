@@ -6,8 +6,9 @@
 #
 # Behavior:
 #   - Prompt is read from the file at <prompt-file> and prepended with read-only, no-delegation rules.
-#   - Underlying agent call is wrapped in `timeout 15m`.
-#   - The response file path is printed on every exit; on failure the file holds whatever the agent produced.
+#   - Underlying agent call is wrapped in `timeout 15m`, with a SIGKILL 30 s later if the CLI ignores SIGTERM.
+#   - Once the prompt is accepted, the response file path is printed on every exit; on failure the file
+#     holds whatever the agent produced. A usage error (exit 2) prints nothing on stdout.
 #   - Exit codes:
 #       0    success
 #       2    bad usage (missing agent, unknown agent, missing/empty/oversized prompt file)
@@ -18,12 +19,13 @@
 #   ask-agent codex ./review-prompt.md
 #   ask-agent claude ./summarize.txt
 #   ask-agent glm ./design-review.md
+#   ask-agent --list
 
 set -euo pipefail
 
 readonly TIMEOUT="15m"
 readonly MAX_PROMPT_BYTES=102400
-readonly VALID_AGENTS="claude, codex, glm, minimax, kimi, qwen, deepseek, grok, gemini"
+readonly AGENTS=(claude codex glm minimax kimi qwen deepseek grok gemini)
 readonly RULES='⚠️ ⚠️ ⚠️  CRITICAL RULES — YOU MUST OBEY THESE WITHOUT EXCEPTION  ⚠️ ⚠️ ⚠️
 
 1. You are running in **READ-ONLY MODE**. You MUST NOT create, modify, or delete
@@ -41,6 +43,7 @@ usage() {
   cat <<'EOF'
 Usage:
   ask-agent <agent> <prompt-file>
+  ask-agent --list
 
 Agents:
   claude    Anthropic Claude Code
@@ -53,9 +56,10 @@ Agents:
   grok      xAI Grok (via opencode)
   gemini    Google Gemini (via opencode)
 
-The prompt is read from <prompt-file> (under 100 KB) and prepended with read-only rules.
+The prompt is read from <prompt-file> (100 KB or less) and prepended with read-only rules.
 The agent call is wrapped in `timeout 15m`.
-The response file path is printed on every exit.
+Once the prompt is accepted, the response file path is printed on every exit.
+--list prints the agent names, one per line.
 EOF
 }
 
@@ -76,7 +80,7 @@ resolve_agent() {
     deepseek) CMD=(opencode run --model llm-netdata-cloud/deepseek-v4.1-flash --variant max) ;;
     grok)     CMD=(opencode run --model llm-netdata-cloud/grok-4.7 --variant xhigh) ;;
     gemini)   CMD=(opencode run --model github-copilot/gemini-3.8-flash --variant high) ;;
-    *)        die "unknown agent '$1'. Valid agents: $VALID_AGENTS" ;;
+    *)        die "unknown agent '$1'. Valid agents: ${AGENTS[*]}" ;;
   esac
 }
 
@@ -91,9 +95,9 @@ prepare_prompt() {
 }
 
 # Some CLIs drop the opening tag of the first thinking block, leaving a bare closing tag; that leading
-# block is stripped too, unless the tag is quoted in backticks and therefore part of the answer.
+# block is stripped too. A tag quoted in backticks is part of the answer and is left alone.
 strip_thinking() {
-  perl -0777 -pe 's/<think>.*?<\/think>\n?//gs; s/\A.*?(?<!`)<\/think>\n?//s'
+  perl -0777 -pe 's/(?<!`)<think>.*?<\/think>(?!`)\n?//gs; s/\A.*?(?<!`)<\/think>(?!`)\n?//s'
 }
 
 # Prints the response file path on every exit so a partial response survives a timeout or CLI failure.
@@ -101,7 +105,7 @@ run_agent() {
   local agent="$1"
   local out status=0
   out="$(mktemp -t "${agent}-output.XXXXXX")"
-  timeout "$TIMEOUT" "${CMD[@]}" "$(echo "$RULES" && cat "$PROMPT_FILE")" \
+  timeout -k 30s "$TIMEOUT" "${CMD[@]}" "$(echo "$RULES" && cat "$PROMPT_FILE")" \
     | strip_thinking >"$out" || status=$?
   echo "$out"
   return "$status"
@@ -111,6 +115,10 @@ main() {
   case "${1:-}" in
     -h|--help)
       usage
+      exit 0
+      ;;
+    -l|--list)
+      printf '%s\n' "${AGENTS[@]}"
       exit 0
       ;;
     "")
