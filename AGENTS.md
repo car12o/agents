@@ -74,7 +74,7 @@ Before performing an action in the table below, you MUST load the matching skill
 | Trigger | Skill |
 |---------|-------|
 | Reading, editing, generating, or reviewing Go (`*.go`, `go.mod`, `go.sum`); search hits do not count | `golang` |
-| Creating a branch, committing, or opening a pull request | `git-conventions` |
+| Creating a branch, committing, pushing, or opening a pull request | `git-conventions` |
 
 # Ask agent
 
