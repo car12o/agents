@@ -11,10 +11,10 @@ disable-model-invocation: true
 If the user provided a path, use it. Otherwise take the newest plan under the repository root; filenames start with a timestamp, so name order is creation order:
 
 ```bash
-root=$(git rev-parse --show-toplevel) && ls "$root"/.agents/plans/*.md 2>/dev/null | tail -1
+root=$(git rev-parse --show-toplevel) && find "$root/.agents/plans" -maxdepth 1 -name '*.md' 2>/dev/null | sort | tail -1
 ```
 
-If the command prints nothing, stop and tell the user: there is no plan, or this is not a git repository. A plan whose filename carries a `-NN-` sequence is one of a split set: list the set and start at the lowest sequence whose plan is not yet merged, or ask which to implement. If the user names specific steps, implement only those, in plan order.
+If the command prints nothing, stop and tell the user: there is no plan, or this is not a git repository. A plan is one of a split set when other plans share its 14-digit timestamp: list the set and start at the lowest sequence whose plan is not yet merged, or ask which to implement. If the user names specific steps, implement only those, in plan order.
 
 Read the plan in full. If a header this skill needs (`Type`, `Slug`, `Depends on`) is missing, ask for it. Then check two gates before modifying any file:
 
