@@ -67,7 +67,7 @@ die() {
 # Sets the global CMD array based on the agent name.
 resolve_agent() {
   case "$1" in
-    claude)   CMD=(claude -p --model claude-opus-4-8 --effort xhigh) ;;
+    claude)   CMD=(claude -p --model claude-opus-5-5 --effort xhigh) ;;
     codex)    CMD=(codex exec --model gpt-5.6-sol) ;;
     glm)      CMD=(opencode run --model llm-netdata-cloud/glm-5.3 --variant max) ;;
     minimax)  CMD=(opencode run --model llm-netdata-cloud/minimax-m3-coder) ;;

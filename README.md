@@ -184,7 +184,7 @@ ask-agent <agent> <prompt-file>
 
 | Agent | Backend | Underlying command |
 |-------|---------|--------------------|
-| `claude` | Anthropic Claude Code | `claude -p --model claude-opus-4-8 --effort xhigh` |
+| `claude` | Anthropic Claude Code | `claude -p --model claude-opus-5-5 --effort xhigh` |
 | `codex` | OpenAI Codex | `codex exec --model gpt-5.6-sol` |
 | `glm` | Zhipu GLM (via OpenCode) | `opencode run --model …/glm-5.3 --variant max` |
 | `minimax` | MiniMax (via OpenCode) | `opencode run --model …/minimax-m3-coder` |
