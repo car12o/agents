@@ -15,6 +15,8 @@ Conventions for every branch, commit, and pull request. Other skills reference t
 
 Name feature branches `<type>/<short-slug>`, where `<type>` is a prefix from the commit table below reflecting the work: `feat/login-endpoint`, `fix/race-condition-worker-pool`, `refactor/split-ingest-pipeline`.
 
+Create them from an up-to-date `<default>`: on it, `git pull --ff-only`; otherwise `git fetch origin <default>:<default>`; then `git switch -c <type>/<short-slug> <default>`. Stop and ask if the update fails or the name already exists; never force.
+
 ## Commits
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
@@ -31,7 +33,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 Use a scope when it adds clarity: `feat(auth): add token refresh`. Keep messages short and focused on *what* changed and *why*.
 
 - One logical change per commit, each building and passing basic checks on its own. Never bundle unrelated changes; split a change set that holds distinct logical changes.
-- Commit only files you modified or created for the task. Never sweep in pre-existing or unrelated changes.
+- Commit only files you modified or created for the task, staged by path. Never `git add -A` or `git add .`: they sweep in pre-existing or unrelated changes.
 
 ## Pull requests
 

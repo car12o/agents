@@ -19,15 +19,11 @@ The skill takes optional arguments selecting which steps to run:
 
 ## Conventions
 
-Load the `git-conventions` skill before running any step. It defines `<default>` (resolved once, before Steps 1 and 3), branch naming, commit format, and pull request rules.
+Load the `git-conventions` skill before running any step. It defines `<default>` (resolved once, before Steps 1 and 3), branch creation and naming, commit format, and pull request rules.
 
 ## Step 1 — branch
 
-Create a feature branch from an up-to-date `<default>`:
-
-1. Bring `<default>` up to date: if on `<default>`, `git pull --ff-only`; otherwise `git fetch origin <default>:<default>`.
-2. Name the branch `<type>/<short-slug>` per `git-conventions`.
-3. `git switch -c <type>/<short-slug> <default>`.
+Create a feature branch `<type>/<short-slug>` from an up-to-date `<default>` per `git-conventions`.
 
 ## Step 2 — commit
 
@@ -40,4 +36,4 @@ Commit only what is already staged — do **not** stage anything yourself. If no
 
 ## Step 3 — pull request
 
-Open a PR from the feature branch into `<default>` (e.g. `gh pr create`) following the pull request rules in `git-conventions`.
+If the branch has no upstream, push it first (`git push -u origin <branch>`) so this step works on its own. Then open a PR from the feature branch into `<default>` (e.g. `gh pr create`) following the pull request rules in `git-conventions`.
