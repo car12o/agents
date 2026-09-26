@@ -33,8 +33,8 @@ Derive `<type>` and `<slug>` from the staged diff, or from what the user asked f
 Commit the staged changes as the user prepared them: do not run checks, edit files, or stage anything that was not staged.
 
 - Read the staged diff (`git diff --cached`) to understand what is being committed.
-- Commit per `git-conventions`. To split the staged set into one commit per logical change, unstage whole paths (`git restore --staged`) and re-stage each group by path, so the commits together equal the staged set. Never `git commit -- <path>`: it commits working-tree content. If a file to be split also has unstaged changes, stop and ask.
+- Commit per `git-conventions`. To split the staged set into one commit per logical change, unstage whole paths (`git restore --staged`) and re-stage each group by path, so the commits together equal the staged set. Never `git commit -- <path>`: it commits working-tree content. If a file to be split also has unstaged changes, or holds several logical changes, stop and ask.
 
 ## Step 3 — pull request
 
-Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL and stop. Otherwise write the title and body from `git log origin/<default>..HEAD` and its diff, open the PR with `gh pr create --base <default> --title … --body …` per `git-conventions`, and report its URL.
+Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL and stop. Otherwise write the title and body from `git log origin/<default>..HEAD` and its diff, open the PR with `gh pr create --base <default> --title … --body-file <file>` per `git-conventions`, and report its URL.

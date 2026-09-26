@@ -25,7 +25,7 @@ Read the plan in full. If a header this skill needs (`Type`, `Slug`, `Depends on
 
 Load `git-conventions` and resolve `<default>`. Stop and ask if `git status --porcelain` lists anything outside `.agents/plans/`, or if `git branch --show-current` prints nothing (detached HEAD): pre-existing changes would be swept into step commits, and detached commits are lost. Then, by current branch:
 
-- `<type>/<slug>`, from the plan's `Type` and `Slug` headers: resume. Match the commits in `git log <default>..HEAD` to the plan's steps, propose the first unimplemented step, and confirm it with the user.
+- `<type>/<slug>`, from the plan's `Type` and `Slug` headers: resume. Match the commits in `git log origin/<default>..HEAD` to the plan's steps, propose the first unimplemented step, and confirm it with the user.
 - `<default>`: if `<type>/<slug>` exists locally or on `origin`, it is most likely an interrupted run of this plan; ask whether to resume on it or name a different branch. Otherwise create it per `git-conventions`.
 - Any other branch: stop and ask.
 

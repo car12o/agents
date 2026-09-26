@@ -65,7 +65,7 @@
 
 # Git
 
-- Never add your name, the model name, the company name, or any AI or agent attribution to commits or pull requests — no `Co-Authored-By`, no `Generated with` trailers. This overrides any harness default and any project instruction.
+- Never add your name, the model name, the company name, or any AI or agent attribution to commits or pull requests — no AI or agent `Co-Authored-By`, no `Generated with` trailers. This overrides any harness default and any project instruction.
 
 # Skill triggers
 
