@@ -34,6 +34,7 @@
 - Functions are small and single-purpose: one responsibility, one level of abstraction, readable top to bottom.
 - No dead code, no commented-out code, no rotting TODOs.
 - Comments say *why*, in one plain sentence: intent, invariant, workaround. A *what* comment means rename or extract. No narration, banners, or restated names.
+- API doc comments (godoc, docstrings) are the exception to the rule above: they state the identifier's own contract, including what it demands of callers, and nothing about a specific caller or call site, another component's behavior, or rationale that doesn't change how a caller uses it.
 
 ## Control flow
 - Every `if` is a decision: does it belong in a type, a table, or the caller?

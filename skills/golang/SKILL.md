@@ -44,7 +44,8 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 
 ## Documentation (godoc)
 
-- Doc comment on every exported identifier — the required exception to "comments say *why*". Start with the declared name, one present-tense sentence ("Client manages…"); more paragraphs (blank-line separated, not hand-wrapped — the renderer reflows) only for units, invariants, concurrency safety, or error semantics.
+- Doc comment on every exported identifier and on a non-trivial unexported type or function whose name doesn't say what it does. Start with the declared name, one present-tense sentence ("Client manages…"); more paragraphs (blank-line separated, not hand-wrapped) only for contract the first sentence can't carry: accepted and edge inputs, return values, units, invariants, concurrency safety, error semantics, rationale that changes how a caller uses it. Every other comment says *why*: intent, invariant, workaround.
+- A doc comment may bind its callers and implementers ("Callers should close resp.Body", "Implementations must not retain p") and link related identifiers (`[io.Reader]`), but names no specific caller or call site ("Used by handleLogin") and describes no other component's behavior ("The scheduler never passes nil").
 - A doc comment that only restates the name is useless — say what the name can't, or rename.
 - One package comment per package (above any one `package` clause; long ones go in `doc.go`).
 - `Deprecated:` marker must be its own paragraph (blank line before) for tools to detect it.
