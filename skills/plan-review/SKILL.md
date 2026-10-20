@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Skill: plan-review
 
-Review a plan with multiple AI agents, verify and merge their findings with your own, put every real tradeoff to the user, then apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
+Review a plan with multiple AI agents, verify and merge their findings with your own, settle what the evidence settles, put the real tradeoffs to the user, and apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
 
 ## Step 1 — Locate the plan
 
@@ -31,7 +31,7 @@ Read the plan in full and check it against the plan-doc template yourself, befor
 - Every test in section 7 and every code-level item in section 8 (migrations, flags, rollback hooks) is scheduled by a step.
 - Every row in section 9 has Blocking `yes` or `no`, and Resolution is blank unless the question is resolved.
 
-A file without the plan-doc header is not a plan: stop and tell the user. Record every other miss as a finding of your own, in the format below, for Step 5 to categorize.
+A file without the plan-doc header is not a plan: stop and tell the user. Record every other miss, and every row with Blocking `yes` and a blank Resolution, as a finding of your own, in the format below, for Step 5 to categorize.
 
 ## Step 3 — Write the prompt file
 
@@ -125,30 +125,32 @@ Launch the agents per `review-fanout`, then review the plans yourself while they
 
 ## Step 5 — Verify and categorize
 
-Verify and merge every finding per `review-fanout`. For this review, verification also means dropping findings that demand what the template permits.
+Verify and merge every finding per `review-fanout`. For this review, verification also means dropping findings that demand what the template permits. A finding that re-opens a decision recorded in a section 9 Resolution, a section 11 line after the initial draft, or the prompt's Context line is dropped unless it cites evidence the record does not mention; then it is decision required, never a clear decision.
 
 Categorize each surviving finding:
 
-- **Clear fix** — the plan text, the repository, or the template fully determines the edit: a test section 7 names with no step, a prerequisite in References but not in Depends on, a missing Size or Verify the step's content makes obvious, a duplicated or misplaced item.
-- **Decision required** — the edit chooses something: a goal, metric, or success criterion; a scope boundary; a design or a step's behaviour; an owner or due date; accepting a risk; a split. A proposed alternative design is always decision required, even when every source agrees. So is a Blocking question with a blank Resolution, and a finding whose sources contradict each other where the plan text does not settle it.
+- **Clear fix** — the plan text, the repository, or the template fully determines the edit: a test section 7 names with no step, a prerequisite in References but not in Depends on, a missing Size or Verify the step's content makes obvious, a duplicated or misplaced item, a Blocking question the plan or the repository answers (fill its Resolution).
+- **Clear decision** — the edit chooses between options, and the cited evidence makes one of them best: it delivers everything the other options named by the finding or the plan deliver, is no worse than any of them on every dimension they differ on (correctness, risk, effort, fit with the repository, or another), the evidence refutes any reason the plan gives for rejecting it, and you can state the reason in one sentence. A goal, success criterion, or scope boundary is clear only when the plan or the repository states the value. If you would hedge, it is decision required.
+- **Decision required** — every other choice: options that trade against each other (scope against effort, risk against speed, a design's simplicity against a capability it drops); a choice that needs information the plan and the repository lack, such as an owner, a due date, a business priority, or whether a risk is acceptable; a Blocking question neither the plan nor the repository answers; a goal or design replacement, or a split, even when the evidence favours it. A decision replaces the design when it abandons the approach section 5's Overview describes; changing one Key decisions row and the steps it touches is a patch.
 
 ## Step 6 — Decide with the user
 
 If any finding is decision required, stop before editing and send one message:
 
 1. Coverage, per `review-fanout`.
-2. The decisions, numbered D1, D2, …: the plan text quoted, the finding with its Source and why it needs a decision, the options with their tradeoffs, and your recommendation with its reason.
-3. The clear fixes about to be applied, one line each, so the user can veto any.
+2. The decisions, numbered D1, D2, …: the plan text quoted, the finding with its Source and why it needs a decision (no option is best, or what information is missing), the options with their tradeoffs, and your recommendation with its reason. A decision re-opened on new evidence says what was settled before.
+3. The clear decisions and clear fixes about to be applied, one line each — a clear decision names the option taken and its reason — so the user can veto any.
 
-Wait for the answers, then apply only what was answered and not vetoed. A decision the user defers stays out of the plan body and becomes a row in section 9: Blocking `yes` if a step depends on it, Resolution blank. With no decision-required findings, go straight to Step 7.
+Wait for the answers, then apply the answered decisions and every clear decision and clear fix not vetoed. A decision the user defers stays out of the plan body; Step 7 adds it to section 9 as a row with Blocking `yes` if a step depends on it and Resolution blank. With no decision-required findings, go straight to Step 7 without asking.
 
-## Step 7 — Update the plan and report
+## Step 7 — Update the plan
 
-Edit each plan file in place: apply the clear fixes and the user's resolutions, write each answered question's Resolution in section 9, and append one line per change to section 11, dated today, stating the resulting plan fact. Never mention the review, agents, or findings anywhere in the plan; the body reads as if written correctly from the start. Never create, rename, or delete plan files: when a decision replaces the goal or design, or requires a split, do not patch — report it and recommend re-running plan-doc with the decisions.
+Edit each plan file in place: apply the clear fixes, the clear decisions, and the user's resolutions; write each answered question's Resolution in section 9 and add a row for each deferred decision; when a decision chooses between designs, record it on that decision's Key decisions row, or a new one: the chosen approach, the rejected one under Alternatives considered, the reason under Why rejected; append one line per change to section 11, dated today, stating the resulting plan fact. Never mention the review, agents, or findings anywhere in the plan; the body reads as if written correctly from the start. Never create, rename, or delete plan files: when a decision replaces the goal or design, or requires a split, do not patch; the verdict is not ready with `plan-doc` next.
 
-Then report:
+Unless a decision replaces the goal or design or requires a split, carry each applied decision through every part of each plan under review, header through section 10, that assumed the old text, re-estimating the Size of each step it touches. An edit the decision fully determines is a clear fix: apply and log it. Never re-apply a vetoed edit or settle a deferred decision; a choice the decision leaves open becomes a section 9 row, Blocking `yes` if a step depends on it, Resolution blank; a change a sibling not under review needs is an unmet condition for Step 8, next the user. Then re-check each edited plan against the Step 2 bullets and the split triggers: repair a miss the edits introduced, vetoes standing; a plan that now needs a split is not ready, next `plan-doc`.
+
+## Step 8 — Report
 
 - Coverage, per `review-fanout`.
-- The Revision Log lines added, and the findings discarded and why. Do not quote plan content otherwise.
-- Decisions deferred and Blocking questions still open.
-- Verdict and next step: **ready to execute** — header valid, every step has Verify and Size, no Blocking question lacks a Resolution, every decision answered; next `plan-implement`. **Needs re-review** — a decision changed Design, Scope, or Implementation Steps; next `plan-review`. **Not ready** — anything else, naming what unblocks it.
+- The Revision Log lines added, the clear decisions applied with their reasons, the clear decisions and fixes vetoed, and the findings discarded and why. Do not quote plan content otherwise.
+- Verdict and next step. **Ready to execute** — header valid, every step has Verify and Size, no Blocking question lacks a Resolution, no decision replaces the goal or design or requires a split; next `plan-implement`. **Not ready** — anything else; name each unmet condition and its next step: the user, for an open Blocking question, a deferred decision, a vetoed fix that leaves a Ready condition unmet, or a change a sibling not under review needs; `plan-doc` with the decisions taken, for a goal or design replacement or a split.
