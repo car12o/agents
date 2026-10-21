@@ -1,11 +1,11 @@
 ---
 name: review-fanout
-description: Shared protocol for fanning a review out to the ask-agent agents — prompt file, background launch, response classes, the orchestrator's own review, verification and merging, coverage, and cleanup. Load only when a review skill (multi-code-review, plan-review) says to.
+description: Shared protocol for fanning a review out to the ask-agent agents — prompt file, agent selection, background launch, retry by resume, response classes, the orchestrator's own review, verification and merging, coverage, and stopping calls. Load only when a review skill (multi-code-review, plan-review) says to.
 ---
 
 # Skill: review-fanout
 
-The fan-out protocol the review skills share. The calling skill supplies the prompt template, the review sections, any extra verification checks, and what happens to verified findings; this skill covers the rest. If no review skill loaded this one, stop and say so: it has no prompt or report of its own.
+The fan-out protocol the review skills share. The calling skill supplies the prompt template, the review sections, any extra verification checks, and what happens to verified findings; this skill covers the rest. If no review skill loaded this one, stop and say so: it has no prompt or report of its own. Load the `ask-agent` skill too: it defines the call, its output, and its exit codes; `<ask-agent>` below is its script's full path.
 
 ## Prompt file
 
@@ -13,9 +13,19 @@ Create a private directory with `mktemp -d`, under the host's scratch directory 
 
 ## Launch
 
-Ask the agents the user listed, or every agent in the `Ask agent` table minus any the user excluded; a name outside the table is yours to fix before launching. From the repository root, make one `TMPDIR=<dir> ask-agent <agent> <dir>/prompt.md` call per agent, all at once through the host's background mechanism — a foreground call is subject to the host's own timeout, which can be shorter than the 15 minutes a call may take; `TMPDIR` puts the response file in `<dir>`. If the host has no background mode, run one shell call with its timeout at the maximum, `(ask-agent <agent> <dir>/prompt.md; echo "<agent> exit $?") &` per agent then `wait`, and do your review after it returns.
+Ask the agents the user listed, or every agent `<ask-agent> --list` prints minus any the user excluded; a name outside that list is yours to fix before launching. From the repository root, make one `TMPDIR=<dir> <ask-agent> <agent> --prompt-file <dir>/prompt.md >/dev/null` call per agent, all at once, in the background as the ask-agent skill's rules say; `TMPDIR` keeps every run in `<dir>`. Discarding stdout, which carries the response, keeps every response out of your context until you collect it, so the captured output is ask-agent's own status lines alone. If the host has no background mode, do your review after the calls return.
 
-Record each call's exit code and its response path: the only stdout line, matching `<agent>-output.`; the rest of the captured output is stderr, whose last line is the reason for a failure. Exit 2, or a call with no path line, is your error and left no file: fix the prompt path or the name and relaunch that call, or stop if `ask-agent` is missing. Any other failure is not fatal; continue with the others. When a call exits 0, check only whether its response holds a finding or the empty-section marker, `grep -Eq '^\*\*Severity:\*\*|_No issues found\._'`; if it holds neither, relaunch that agent once, at once, and record the new path. Never retry an error or a timeout.
+Record each call's exit code and, from its last `ask-agent: run <run> turn <N>, …` line, its run and turn: the response is `<run>/turn-<N>/response.md`. The first such line appears as the agent starts, so a call killed before its summary still names its run. A call with no `ask-agent: run` line never started a run and is your error: exit 64 is bad usage, 126 or 127 a wrong script path; fix the call and relaunch it, or stop if the script is missing. Any other failure is not fatal; continue with the others.
+
+## Retry by resume
+
+An agent gets at most one retry: a resume of its own run, launched at once in the background like the first call, so it keeps everything it already read. Pass the retry prompt on stdin, `<ask-agent> --resume <run> [--timeout 10m] >/dev/null <<'EOF'`:
+
+- Exit 0 and the response holds neither a finding nor the empty-section marker, `grep -Eq '^\*\*Severity:\*\*|_No issues found\._'`: "Your answer is missing or incomplete. Output your complete answer now, in exactly the format the first message specified."
+- Exit 124 or 137, with `--timeout 10m`: "Time is up. Stop investigating and output what you have found so far, in exactly the format the first message specified."
+- Any other non-zero exit whose reason shows a transient failure — a dropped connection, a rate limit (HTTP 429), a server error (HTTP 5xx), or an overloaded provider: "The previous attempt failed mid-answer. Continue, and output your complete answer in exactly the format the first message specified."
+
+Never retry a permanent failure — an exhausted quota or usage limit, an authentication failure, an unknown model, an invalid option, a context-length limit, any other HTTP 4xx — a stopped call (exit 143), or a failure whose reason names no cause. If the resume exits 64 because the run has no session, launch the agent afresh instead; that is still its one retry. The retry's exit code, run, and turn become the agent's; its first response still counts at Collect. That grep is the only look you take at a response before your own review is done.
 
 ## Your review, while agents run
 
@@ -23,15 +33,15 @@ Review the artifact yourself with the same sections and finding format the promp
 
 ## Collect
 
-When every call has returned and your review is done, classify each agent from its exit code and response file, first match wins:
+When every call has returned and your review is done, classify each agent from its last call's exit code and response file, first match wins; findings in the prompt's format count from every response the agent produced, its first call's included:
 
-| Exit  | Response                                                      | Class                                            |
-|-------|---------------------------------------------------------------|--------------------------------------------------|
-| 0     | empty                                                         | empty                                            |
-| 0     | no finding and no empty-section marker in the prompt's format | narration-only                                   |
-| 0     | otherwise                                                     | usable, zero findings allowed                    |
-| 124   | any                                                           | timeout                                          |
-| other | any                                                           | error, with the last line of stderr as the reason |
+| Exit  | Response                                                      | Class                                                      |
+|-------|---------------------------------------------------------------|------------------------------------------------------------|
+| 0     | empty                                                         | empty                                                      |
+| 0     | no finding and no empty-section marker in the prompt's format | narration-only                                             |
+| 0     | otherwise                                                     | usable, zero findings allowed                              |
+| 124, 137 | any                                                        | timeout                                                    |
+| other | any                                                           | error, with the reason from the last status line           |
 
 Findings in the prompt's format count whatever the exit: a timeout or error file that holds some is partial. A response saying the agent could not read the artifact is narration-only; when several say so, find the common cause before going on. If no agent is usable or partial, stop: report the coverage lines and ask whether to continue on your own findings alone.
 
@@ -41,8 +51,8 @@ Do not take findings at face value, agent or your own. Open each citation at the
 
 ## Coverage
 
-The calling skill's report starts with one line per agent: usable or partial, with findings raised and how many survived verification, plus the exit for partial; or its failure class (timeout / error / empty / narration-only) with the reason. Add "after retry" when the agent was relaunched.
+The calling skill's report starts with one line per agent: usable or partial, with findings raised and how many survived verification, plus the exit for partial; or its failure class (timeout / error / empty / narration-only) with the reason. Add "after resume" when the agent was resumed, or "after relaunch" when it was launched afresh.
 
 ## Cleanup
 
-After the report, or on any stop: stop calls still running, then remove `<dir>`.
+After the report, or on any stop, stop calls still running. Keep `<dir>`: its runs stay resumable for follow-up questions to an agent, and the OS clears it.

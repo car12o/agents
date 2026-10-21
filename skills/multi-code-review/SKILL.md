@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Skill: multi-code-review
 
-Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
+Review the current branch's changes using multiple AI agents, then compile a verified final report. By default every finding carries a paste-ready pull request comment; pass `no-pr` to omit it. Load `review-fanout`; it governs the prompt file, background launch, retries, response classes, your own review, verification and merging, coverage, and stopping calls, whose runs it keeps.
 
 > **Important:** the prompt file carries only the change summary, the changed-file paths, and PR intent and discussion.
 

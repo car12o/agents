@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Skill: plan-review
 
-Review a plan with multiple AI agents, verify and merge their findings with your own, settle what the evidence settles, put the real tradeoffs to the user, and apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, background launch, response classes, your own review, verification and merging, coverage, and cleanup.
+Review a plan with multiple AI agents, verify and merge their findings with your own, settle what the evidence settles, put the real tradeoffs to the user, and apply the fixes to the plan file. Load `review-fanout`; it governs the prompt file, background launch, retries, response classes, your own review, verification and merging, coverage, and stopping calls, whose runs it keeps.
 
 ## Step 1 — Locate the plan
 
