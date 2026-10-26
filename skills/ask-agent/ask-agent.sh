@@ -62,8 +62,8 @@ claude    claude    claude-opus-5-5                              Anthropic Claud
 codex     codex     gpt-6.1-sol                                  OpenAI Codex
 glm       opencode  llm-netdata-cloud/glm-5.3#high               Zhipu GLM (via opencode)
 minimax   opencode  llm-netdata-cloud/minimax-m3.1-flash         MiniMax (via opencode)
-kimi      opencode  llm-netdata-cloud/k3#high                    Moonshot Kimi (via opencode)
-qwen      opencode  llm-netdata-cloud/qwen3.8-max                Alibaba Qwen (via opencode)
+kimi      opencode  llm-netdata-cloud/k3.1-pro#high              Moonshot Kimi (via opencode)
+qwen      opencode  llm-netdata-cloud/qwen3.8-flash-next         Alibaba Qwen (via opencode)
 deepseek  opencode  llm-netdata-cloud/deepseek-v4.1-flash#high   DeepSeek (via opencode)
 grok      opencode  llm-netdata-cloud/grok-4.7#xhigh             xAI Grok (via opencode)
 gemini    opencode  github-copilot/gemini-3.8-flash#high         Google Gemini (via opencode)"

@@ -204,8 +204,8 @@ The `plan-doc → plan-review → plan-implement` skills form a pipeline: draft 
 | `codex` | Codex | `gpt-6.1-sol` |
 | `glm` | OpenCode | `llm-netdata-cloud/glm-5.3#high` |
 | `minimax` | OpenCode | `llm-netdata-cloud/minimax-m3.1-flash` |
-| `kimi` | OpenCode | `llm-netdata-cloud/k3#high` |
-| `qwen` | OpenCode | `llm-netdata-cloud/qwen3.8-max` |
+| `kimi` | OpenCode | `llm-netdata-cloud/k3.1-pro#high` |
+| `qwen` | OpenCode | `llm-netdata-cloud/qwen3.8-flash-next` |
 | `deepseek` | OpenCode | `llm-netdata-cloud/deepseek-v4.1-flash#high` |
 | `grok` | OpenCode | `llm-netdata-cloud/grok-4.7#xhigh` |
 | `gemini` | OpenCode | `github-copilot/gemini-3.8-flash#high` |
