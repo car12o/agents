@@ -75,4 +75,5 @@ Before performing an action in the table below, you MUST load the matching skill
 | Trigger | Skill |
 |---------|-------|
 | Reading, editing, generating, or reviewing Go (`*.go`, `go.mod`, `go.sum`); search hits do not count | `golang` |
+| Reading, editing, generating, or reviewing React DOM code (`*.tsx`/`*.jsx` with React components, hooks, or tests; Next.js, React Router, or TanStack Start apps; a React app built with Vite, including its build, lint, TypeScript, and package config); not React Native; search hits do not count | `react` |
 | Creating a branch, committing, pushing, or opening a pull request | `git-conventions` |
