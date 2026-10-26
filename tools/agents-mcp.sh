@@ -9,8 +9,10 @@
 #
 # Behavior:
 #   - `add` writes all files into the current working directory. All MCP servers
-#     are included by default; use -m/--mcp to pick a subset and -u/--uri to
-#     override the postgres DATABASE_URI.
+#     are included by default; use -m/--mcp to pick a subset, -u/--uri to
+#     override the postgres DATABASE_URI, -e/--executable-path to override
+#     the browser the playwright MCP drives (default /usr/bin/brave), and
+#     -a/--attach to have it attach to that browser's running instance.
 #   - `rm`  removes all files (and the .codex directory if left empty).
 #   - Exit codes:
 #       0    success
@@ -42,14 +44,11 @@ readonly JSON_CONFIG='{
       }
     },
     "playwright": {
-      "command": "docker",
+      "command": "npx",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--init",
-        "--pull=always",
-        "mcr.microsoft.com/playwright/mcp"
+        "@playwright/mcp@latest",
+        "--executable-path",
+        "/usr/bin/brave"
       ]
     }
   }
@@ -85,14 +84,19 @@ readonly JQ_TO_OPENCODE='{
 usage() {
   cat <<'EOF'
 Usage:
-  agents-mcp.sh add [-m|--mcp <name>]... [-u|--uri <database-uri>]
+  agents-mcp.sh add [-m|--mcp <name>]... [-u|--uri <database-uri>] [-e|--executable-path <path>] [-a|--attach]
   agents-mcp.sh rm
 
 Commands:
   add  Write .mcp.json, .codex/config.toml and opencode.json to the current directory.
-         -m, --mcp <name>  MCP server to include; repeat to include several
-                           (e.g. -m postgres -m playwright). Default: all.
-         -u, --uri <uri>   Override the postgres DATABASE_URI.
+         -m, --mcp <name>              MCP server to include; repeat to include several
+                                       (e.g. -m postgres -m playwright). Default: all.
+         -u, --uri <uri>               Override the postgres DATABASE_URI.
+         -e, --executable-path <path>  Browser executable the playwright MCP drives.
+                                       Default: /usr/bin/brave.
+         -a, --attach                  Make the playwright MCP attach to the running
+                                       browser instead of launching a new one. Needs
+                                       the "Playwright Extension" installed in it.
   rm   Remove .mcp.json, .codex/config.toml and opencode.json from the current directory.
 EOF
 }
@@ -116,13 +120,20 @@ mcp_names() {
 }
 
 render_json_config() {
-  local uri="$1"
-  shift
-  jq --arg uri "$uri" \
+  local uri="$1" executable="$2" attach="$3"
+  shift 3
+  jq --arg uri "$uri" --arg executable "$executable" --argjson attach "$attach" \
     --argjson names "$(printf '%s\n' "$@" | jq -Rn '[inputs]')" '
     .mcpServers |= with_entries(select(.key | IN($names[])))
     | if $uri != "" and .mcpServers.postgres then
         .mcpServers.postgres.env.DATABASE_URI = $uri
+      else . end
+    | if $executable != "" and .mcpServers.playwright then
+        .mcpServers.playwright.args |=
+          (index("--executable-path") as $i | .[$i + 1] = $executable)
+      else . end
+    | if $attach and .mcpServers.playwright then
+        .mcpServers.playwright.args += ["--extension"]
       else . end
   ' <<<"$JSON_CONFIG"
 }
@@ -152,7 +163,7 @@ remove_file() {
 add_config() {
   command -v jq >/dev/null || die "jq is required to generate the config files."
 
-  local uri="" mcps=()
+  local uri="" executable="" attach=false mcps=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -m|--mcp)
@@ -167,6 +178,15 @@ add_config() {
         uri="$2"
         shift 2
         ;;
+      -e|--executable-path)
+        [[ -n "${2:-}" ]] || die "$1 requires a value."
+        executable="$2"
+        shift 2
+        ;;
+      -a|--attach)
+        attach=true
+        shift
+        ;;
       *)
         usage >&2
         die "unknown add option '$1'."
@@ -177,9 +197,13 @@ add_config() {
   [[ ${#mcps[@]} -gt 0 ]] || mapfile -t mcps < <(mcp_names)
   [[ -z "$uri" ]] || contains postgres "${mcps[@]}" ||
     die "--uri only applies to the postgres MCP."
+  [[ -z "$executable" ]] || contains playwright "${mcps[@]}" ||
+    die "--executable-path only applies to the playwright MCP."
+  [[ "$attach" == false ]] || contains playwright "${mcps[@]}" ||
+    die "--attach only applies to the playwright MCP."
 
   local json_config
-  json_config="$(render_json_config "$uri" "${mcps[@]}")"
+  json_config="$(render_json_config "$uri" "$executable" "$attach" "${mcps[@]}")"
 
   local base="$(pwd)"
   write_file "$base/$JSON_FILE" "$json_config"

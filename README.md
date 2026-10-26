@@ -70,7 +70,8 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | `perl` | `ask-agent` | strips `<think>…</think>` blocks from responses |
 | `timeout`, `flock`, `env --default-signal` | `ask-agent` | coreutils and util-linux: the call's time limit, the one-turn-per-run lock, and SIGINT for background launches |
 | `bubblewrap`, `socat` | `ask-agent`'s `claude` agent | Claude Code's Bash sandbox on Linux; without them the `claude` call fails, since the sandbox is required |
-| `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` and `playwright` MCP servers |
+| `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` MCP server |
+| Node.js (`npx`) | the MCP config produced by `agents-mcp` | runs the `playwright` MCP server |
 | `git` | `git-release`, `git-flow`, statusline | release branching, feature branching, branch display |
 | `gh` | `git-flow`, `multi-code-review` | opens PRs, reads PR title/body/comments |
 
@@ -220,15 +221,15 @@ Standalone shell scripts symlinked onto your `PATH` (extension stripped) by `mak
 Manages a project-local **MCP server config** in the current working directory. JSON is the single source of truth; the Codex TOML and opencode JSON are derived from it at runtime via `jq`.
 
 ```bash
-agents-mcp add [-m|--mcp <name>]... [-u|--uri <database-uri>]
+agents-mcp add [-m|--mcp <name>]... [-u|--uri <database-uri>] [-e|--executable-path <path>] [-a|--attach]
 agents-mcp rm
 ```
 
-- `add` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. Two MCP servers are bundled, both run via Docker:
-  - `postgres` — `crystaldba/postgres-mcp` in **unrestricted** access mode, with `DATABASE_URI` defaulting to `postgres://human_ro@0.0.0.0:5432/database`. Override it with `-u/--uri`.
-  - `playwright` — `mcr.microsoft.com/playwright/mcp`.
+- `add` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. Two MCP servers are bundled:
+  - `postgres` — `crystaldba/postgres-mcp` via Docker, in **unrestricted** access mode, with `DATABASE_URI` defaulting to `postgres://human_ro@0.0.0.0:5432/database`. Override it with `-u/--uri`.
+  - `playwright` — `@playwright/mcp@latest` via `npx`, driving the browser executable at `/usr/bin/brave` (Brave). Override it with `-e/--executable-path`. By default it launches a new browser; `-a/--attach` makes it attach to the browser you already have running instead, with its tabs and logged-in sessions. Attaching needs the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) installed in that browser, and you approve each connection in the tab it opens.
 
-  All servers are included by default; pass `-m/--mcp <name>` (repeatable) to include only a subset. `--uri` is rejected unless `postgres` is among the selected servers.
+  All servers are included by default; pass `-m/--mcp <name>` (repeatable) to include only a subset. `--uri` is rejected unless `postgres` is among the selected servers, and `--executable-path` and `--attach` unless `playwright` is.
 - `rm` — removes all generated files and the `.codex` directory if left empty.
 - **Exit codes:** `0` success · `1` bad usage, missing `jq`, or `rm` with no file present.
 
