@@ -1,6 +1,6 @@
 ---
 name: git-flow
-description: Stepped git flow — create a feature branch, commit staged changes, then push and open a PR. Run all steps or select a subset by number or name (branch, commit, pr).
+description: Stepped git flow — create a feature branch, commit staged changes, then push and open a PR. Run all steps or select a subset by number or name (branch, commit, pr); pass a plan's .md path to draw the PR description from it.
 disable-model-invocation: true
 ---
 
@@ -10,7 +10,8 @@ disable-model-invocation: true
 
 The arguments are the text after the skill name in the invocation.
 
-- **No arguments** — run all steps in order.
+- **No step references** — run all steps in order.
+- A token ending in `.md` is not a step reference: it names the plan Step 3 reads. If that file does not exist, stop and report it.
 - Steps can be referenced by number (`1`, `2`, `3`) or name (`branch`, `commit`, `pr`), mixed freely, comma- or space-separated (e.g. `2 3`, `commit,pr`, `1 2`). Names are case-insensitive; empty tokens and repeats are ignored.
 - Selected steps always run in step order (1 → 2 → 3), regardless of the order given.
 - If any reference is unknown, stop and report it, listing the valid steps (`1`/`branch`, `2`/`commit`, `3`/`pr`). Nothing runs — do not execute the valid steps from a partially invalid selection.
@@ -37,4 +38,7 @@ Commit the staged changes as the user prepared them: do not run checks, edit fil
 
 ## Step 3 — pull request
 
-Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL and stop. Otherwise write the title and body from `git log origin/<default>..HEAD` and its diff, open the PR with `gh pr create --base <default> --title … --body-file <file>` per `git-conventions`, and report its URL.
+Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL, say when the push added commits its body predates, and stop. Otherwise:
+
+1. Write the title, and write the body to `<file>`, per `git-conventions`, from `git log origin/<default>..HEAD`, `git diff origin/<default>...HEAD`, this session's record of the task and of the checks you saw run, and what the user reported. Read a plan only when the user passed one, and only for the problem, decisions, and rejected alternatives: a plan records intent, so the commits win where they disagree, and its `Verify` steps and Testing Strategy are not checks that ran.
+2. Open the PR with `gh pr create --base <default> --title … --body-file <file>`, adding `--attach` for each screenshot or recording per `git-conventions`, and report its URL.
