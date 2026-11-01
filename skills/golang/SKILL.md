@@ -25,7 +25,7 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - Receivers consistent per type: if any method on `T` needs a pointer receiver, all do. Pointer when the method mutates or the struct is large; value for small immutable types.
 - Zero values are useful: design so `var x T` is valid (`sync.Mutex`, `bytes.Buffer`, `strings.Builder` all zero-work). No constructor whose only job is zeroing fields; no required `Init()` call. Don't make `nil` mean "use the default" — use functional options or zero-value-ready types.
 - Getter/setter with no invariant — export the field instead.
-- Embedding is composition, not inheritance. Use explicit fields when you don't want method promotion.
+- Embedding is composition, not inheritance. Use explicit fields when you don't want method promotion. 1.27+ struct literals may key a promoted field directly (`User{ID: 1}` through embedded `Base`), except through a pointer embed or alongside a `Base:` key.
 - `iota` enums: use a sentinel zero value (`StatusUnknown`) when an uninitialized field must be invalid; generate `String()` with `//go:generate stringer -type=Status`.
 - `init()` is for driver registration only — no network, no file I/O, no side effects that complicate testing.
 - Constructor injection for DI; wire dependencies in `main`/`run` (the composition root). No DI frameworks.
@@ -48,7 +48,7 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - A doc comment may bind its callers and implementers ("Callers should close resp.Body", "Implementations must not retain p") and link related identifiers (`[io.Reader]`), but names no specific caller or call site ("Used by handleLogin") and describes no other component's behavior ("The scheduler never passes nil").
 - A doc comment that only restates the name is useless — say what the name can't, or rename.
 - One package comment per package (above any one `package` clause; long ones go in `doc.go`).
-- `Deprecated:` marker must be its own paragraph (blank line before) for tools to detect it.
+- `Deprecated:` marker must be its own paragraph (blank line before) for tools to detect it. When the old function's body is just a call to its replacement, add `//go:fix inline` as the last line of its doc comment so `go fix` (1.26+) rewrites callers — a directive in a separate comment block is silently ignored.
 - `Example*` functions in `_test.go` are runnable, verified docs — prefer over prose. Naming: `ExampleFoo`, `ExampleClient_Publish`, `ExampleClient_Publish_withRetry`.
 - 1.19+ doc markup: `# Heading`, `[Identifier]` links, and `-`/`1.` lists with a preceding blank line.
 
@@ -59,14 +59,15 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - Dependencies point inward: adapters (HTTP/gRPC) import domain packages; domain never imports adapters or sibling domains. Shared infra goes in `platform/`/`infra/`.
 - Cross-domain calls go through a consumer-owned interface (`order` accepts a `UserGetter`, not `user.Service`); wire the concrete impl in `main`.
 - Convert transport types → domain types at the boundary; internal code never touches JSON tags, protobuf messages, or `sql.Row`, and never returns implementation types (`*sql.Row`, `*http.Response`) — return your own. Adapters are thin: parse input, call a service, format output — no business logic.
-- Generics for type-independent logic (collections, algorithms); concrete types or interfaces when behavior varies. Constraints: `any`, `comparable`, `cmp.Ordered`.
+- Generics for type-independent logic (collections, algorithms); concrete types or interfaces when behavior varies. Constraints: `any`, `comparable`, `cmp.Ordered`; 1.26+ a constraint may refer to itself (`type Adder[A Adder[A]] interface{ Add(A) A }`).
+- Generic methods (1.27+): a method may declare its own type parameters (`func (l List[E]) Map[F any](f func(E) F) List[F]`) — use one when the operation belongs to the type, a package-level generic function otherwise. Interfaces can't declare generic methods and a generic method never satisfies an interface method, so keep them out of interface contracts.
 
 ## Errors
 
 - Wrap with `fmt.Errorf("op: %w", err)` when crossing a package boundary or adding context the caller lacks; bare `return err` when the function name already conveys it — don't over-wrap.
 - `%v` instead of `%w` to deliberately break the chain (hide the underlying error from `errors.Is`/`As`).
 - Handle once: log+handle at the boundary that handles, return everywhere else — never both (duplicate noise).
-- Sentinel errors (`var ErrNotFound = errors.New(...)`) for conditions callers check; custom types when callers need structured data. Match with `errors.Is`/`errors.As`, never `==` on a wrapped error.
+- Sentinel errors (`var ErrNotFound = errors.New(...)`) for conditions callers check; custom types when callers need structured data. Create a custom error as the receiver kind of its `Error()` (`E` for a value receiver, `*E` for a pointer receiver) and match that exact type with `errors.Is` or `errors.AsType[E](err)`/`errors.AsType[*E](err)` (1.26+; `errors.As` before) — a kind mismatch silently fails to match (vet flags wrapping `&E{}` for a value-receiver `E`, 1.27+). Never `==` on a wrapped error.
 - Check what an error *can do*, not its concrete type, via a small interface (`interface{ Timeout() bool }`). `Temporary()` is deprecated (1.18) — use `Timeout()` or specific conditions.
 - `errors.Join` (1.20+) to aggregate: batch operations, and deferred close — `defer func(){ err = errors.Join(err, f.Close()) }()`, which requires a **named result** `err`; with an unnamed result the deferred assignment is lost.
 - Map storage/transport errors to domain errors at layer boundaries (`sql.ErrNoRows` → `ErrNotFound` in the store); an HTTP handler then switches on `errors.Is` to status codes.
@@ -85,7 +86,7 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 
 ## Concurrency
 
-- Every goroutine needs a shutdown path (context, done channel, or errgroup) — otherwise it leaks → eventual OOM.
+- Every goroutine needs a shutdown path (context, done channel, or errgroup) — otherwise it leaks → eventual OOM. The `goroutineleak` profile (1.27+; `pprof.Lookup("goroutineleak")`, `/debug/pprof/goroutineleak`) reports goroutines blocked on a primitive no runnable goroutine can reach; it misses primitives reachable from globals.
 - Start goroutines in the caller; the caller owns lifecycle and concurrency strategy.
 - `errgroup` over bare `WaitGroup` when goroutines can fail; `g.SetLimit(n)` for bounded fan-out. `errgroup` does not recover panics.
 - `wg.Go(f)` (1.25+) over `wg.Add(1)` + `go func(){ defer wg.Done(); ... }()` — the count can't drift or race `Wait`. Pre-1.25: `Add(1)` in the caller (never inside the goroutine), `defer wg.Done()` as the first line. Neither returns errors or recovers panics — that's `errgroup`.
@@ -105,7 +106,8 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - Parameterized SQL only — never interpolate user input. Same principle for any interpreter (shell, HTML templates, LDAP).
 - Subprocess: `exec.CommandContext` with explicit args, never `sh -c` strings. Separate flags from positional args with `--`, allowlist subcommands, validate input lexically (defeats flag smuggling like `--upload-pack=`).
 - Path traversal: `os.Root`/`os.OpenRoot` (1.24+) confines ops to a subtree (OS-enforced; resists symlink and TOCTOU escapes); pre-1.24, `filepath.IsLocal` (1.20+) rejects escaping paths lexically — no lexical check survives symlinks, so prefer `os.Root` when available.
-- `crypto/rand` for security-sensitive randomness (tokens, keys); `math/rand/v2` (1.22+) for non-security use (shuffle, sample) — avoid legacy `math/rand`.
+- `crypto/rand` for security-sensitive randomness (tokens, keys); `math/rand/v2` (1.22+) for non-security use (shuffle, sample) — avoid legacy `math/rand`. 1.26+ `rsa`/`ecdsa`/`ecdh`/`dsa` key generation and ECDSA signing ignore their `rand io.Reader` argument, but `ed25519.GenerateKey` (when non-nil), `rsa.SignPSS`, and `rsa.EncryptOAEP` still read it — pass `crypto/rand.Reader` there, never `nil` (panics). Tests call `testing/cryptotest.SetGlobalRandom(t, seed)` (1.26+) to make crypto failures reproducible, not to pin exact outputs — an algorithm's use of randomness can change between Go releases.
+- Reverse proxies: `httputil.ReverseProxy` with `Rewrite` (1.20+), never `Director` (deprecated 1.26) — a client can strip headers `Director` adds by naming them hop-by-hop.
 - No hardcoded secrets — env vars, file mounts, secret stores. Never log secrets, raw tokens, full headers, or full request bodies; log method/path/status only.
 - Shed excess load early: a bounded semaphore (`chan struct{}`) returns 429 when full rather than queueing unboundedly.
 
@@ -116,16 +118,22 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - Always the `...Context` variants.
 - Transactions: `BeginTx` → `defer tx.Rollback()` (no-op after Commit) → operate on `tx` (not `db`) → `tx.Commit()`.
 - Multi-row: `defer rows.Close()`, loop `rows.Next()`/`rows.Scan`, then check `rows.Err()` after the loop — it catches errors that ended iteration (network, cancelled ctx). Single row: `QueryRowContext(...).Scan(...)`.
-- Nullable columns: `sql.Null[T]` (1.22+) or pointer fields (`*string`, nil = NULL; pairs well with JSON `omitempty`). Use `sql.Null*` when you need the Valid/zero distinction or want to avoid pointer indirection in hot paths.
+- Nullable columns: `sql.Null[T]` (1.22+) or pointer fields (`*string`, nil = NULL; pairs with JSON `omitzero` — 1.24+, `omitempty` before). Use `sql.Null*` when you need the Valid/zero distinction or want to avoid pointer indirection in hot paths.
 - Use a migration tool (goose, golang-migrate, atlas) — don't hand-roll. Keep `migrations/` versioned; apply at startup (simple service) or as a separate CI step (shared DB).
 
 ## JSON & encoding
 
-- Struct tags: `json:"name"`; `,omitempty` skips zero `""`/0/nil/false; `,omitzero` (1.24+) uses the type's `IsZero()` when defined (else the plain zero test) — correct for `time.Time` and custom types where `omitempty` misbehaves; `json:"-"` is never marshalled.
-- Streaming: `json.NewDecoder(r)` / `json.NewEncoder(w)` over buffering the whole body; `dec.DisallowUnknownFields()` rejects unknown fields — for a strict single document, also confirm a second `Decode` returns `io.EOF`; `dec.UseNumber()` to preserve large/precise integers.
-- Custom `MarshalJSON`/`UnmarshalJSON` for wire-format control and enum validation on unmarshal.
-- `json.RawMessage` for envelope-then-dispatch partial parsing.
-- Write responses through a helper that encodes to a buffer *first*, then sets `Content-Type` and status — so an encode error becomes a clean 500, not a half-written body. Log (don't silently drop) the final `w.Write` error.
+- Package by `go` directive: 1.27+ new modules and new wire types use `encoding/json/v2` (package `json`; import v1 as `jsonv1` when both are needed); a type already served through v1 stays on v1 until all its call sites move together — `json.Marshal(v, jsonv1.DefaultOptionsV1(), …)` keeps v1 behavior while you flip one option at a time. Before 1.27 use v1 (v2 is a `GOEXPERIMENT`). Since 1.27 v1 runs on the v2 engine, so its error text may change.
+- Struct tags, both versions: `json:"name"`; `json:"-"` is never marshalled; `,omitzero` (1.24+) omits the Go zero value, or whatever the type's `IsZero()` reports — use it on bools, numbers, pointers, interfaces, `time.Time`, and custom types.
+- v1: `,omitempty` omits `""`/0/false/nil and empty collections.
+- v1: stream with `json.NewDecoder(r)`/`json.NewEncoder(w)` rather than buffering the whole body; `dec.DisallowUnknownFields()` rejects unknown fields — for a strict single document, also confirm a second `Decode` returns `io.EOF`; `dec.UseNumber()` preserves large/precise integers.
+- v1: custom `MarshalJSON`/`UnmarshalJSON` for wire-format control and enum validation on unmarshal; `json.RawMessage` for envelope-then-dispatch partial parsing.
+- v2 defaults differ from v1: case-sensitive field matching (`case:ignore` tag option to relax), duplicate names and invalid UTF-8 rejected, nil slices/maps encode as `[]`/`{}`, map key order is non-deterministic (`json.Deterministic(true)` for golden output), no HTML escaping (`jsontext.EscapeForHTML(true)` when output lands in HTML), `,omitempty` omits only values that encode as `null`/`""`/`{}`/`[]` (a zero int is kept, a pointer to `""` is dropped), and `time.Duration` fails to marshal — give it a type with `MarshalText`/`UnmarshalText`, or pass `jsonv1.FormatDurationAsNano(true)` for v1's nanoseconds.
+- v2 differs from the 1.25–1.26 experiment: tag option `inline` is now `embed`; `format`, `unknown`, `DiscardUnknownMembers`, and `SkipFunc` are gone. An unknown tag option is silently ignored and `format` fails at run time.
+- v2 decoding: one strict document with `json.UnmarshalRead(r, &v, json.RejectUnknownMembers(true))`, which consumes the reader and rejects trailing data; a stream with `jsontext.NewDecoder(r)` + `json.UnmarshalDecode` per value. Numbers decoded into `any` are still `float64` (exact only to 2^53) — decode large integers into integer fields or `jsontext.Value`.
+- v2 encoding: `json.MarshalWrite(w, v)` streams one value with no trailing newline; for a multi-value stream, call `json.MarshalEncode` on one `jsontext.NewEncoder(w)`, which separates values with newlines.
+- v2 custom wire format and enum validation: `MarshalJSONTo(*jsontext.Encoder) error`/`UnmarshalJSONFrom(*jsontext.Decoder) error` methods (no intermediate `[]byte`; `MarshalJSON`/`UnmarshalJSON` still work); for types you don't own, pass `json.WithMarshalers(json.MarshalToFunc(...))` and `json.WithUnmarshalers(json.UnmarshalFromFunc(...))` per call — each applies to its own direction only. `jsontext.Value` for envelope-then-dispatch partial parsing.
+- Both versions: write responses through a helper that encodes to a buffer *first*, then sets `Content-Type` and status — so an encode error becomes a clean 500, not a half-written body. Log (don't silently drop) the final `w.Write` error.
 
 ## Testing
 
@@ -134,14 +142,14 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 - `t.Helper()` in every helper; `t.Cleanup()` over `defer` in helpers (fires at test end, after the caller has used the resource).
 - `package foo_test` for black-box public-API tests; `package foo` only when you need unexported access.
 - Prefer fakes (real in-memory behavior) over mocks; stub for canned inputs; mock only to verify interactions (it couples tests to implementation). Assert with testify (see below); `cmp.Diff` (with `cmpopts.IgnoreUnexported`/`EquateApprox`/`SortSlices`) for deep-struct comparisons where testify's diff falls short.
-- HTTP handlers: drive them with `httptest.NewRequest` + `httptest.NewRecorder`, then assert on `rec.Result()` status/headers/body — no real socket or port.
+- HTTP handlers: drive them with `httptest.NewRequest` + `httptest.NewRecorder`, then assert on `rec.Result()` status/headers/body — no real socket or port. For client-to-server tests, `httptest.NewTestServer(t, h)` (1.27+) + `srv.Client()`: in-memory network, closed at test cleanup, fails the test on a handler panic, works inside a `synctest` bubble; before 1.27, `httptest.NewServer` + `t.Cleanup(srv.Close)`.
 - `t.Context()` (1.24+): context cancelled at test end — use over hand-rolled background+cancel; in a subtest it's cancelled when *that* subtest ends.
 - `b.Loop()` (1.24+) in benchmarks instead of `for range b.N` (prevents dead-code elimination); run `go test -bench=. -benchmem`.
-- `testing/synctest` (1.25+; 1.24: experimental behind `GOEXPERIMENT=synctest` with the older `synctest.Run` API): deterministic concurrency tests via `synctest.Test(t, func(t *testing.T){...})` — inside the bubble, fake time advances only when all goroutines block (`time.Sleep` is instant). The bubble doesn't prevent data races on shared state — keep `-race` on.
-- Golden files: compare against `testdata/*.golden`, regenerate behind an `-update` flag.
+- `testing/synctest` (1.25+; 1.24: experimental behind `GOEXPERIMENT=synctest` with the older `synctest.Run` API): deterministic concurrency tests via `synctest.Test(t, func(t *testing.T){...})` — inside the bubble, fake time advances only when all goroutines block (`time.Sleep` is instant). `synctest.Sleep(d)` (1.27+) is `time.Sleep(d)` + `synctest.Wait()` — use it to advance the clock and let every other goroutine settle before asserting. The bubble doesn't prevent data races on shared state — keep `-race` on.
+- Golden files: compare against `testdata/*.golden`, regenerate behind an `-update` flag. Other test output files (dumps, failure diffs) go in `t.ArtifactDir()` (1.26+), kept when run with `go test -artifacts`.
 - Fuzz: `f.Add` seeds + `f.Fuzz(func(t, input){...})`; return early on expected-invalid input.
 - Integration tests behind `//go:build integration` + a `testing.Short()` skip; run with `-tags=integration`.
-- `t.Parallel()` on the test and each subtest to parallelize — only tests sharing no state (globals, ports, fixtures); incompatible with `t.Setenv`/`t.Chdir`.
+- `t.Parallel()` on the test and each subtest to parallelize — only tests sharing no state (globals, ports, fixtures); incompatible with `t.Setenv`/`t.Chdir`/`cryptotest.SetGlobalRandom`, which panic in a parallel test or one with a parallel ancestor.
 
 ## Testify (mandatory for test assertions — add the dependency if the project lacks it; gate newer APIs on the pinned version)
 
@@ -164,13 +172,13 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 
 ## Building a long-running service
 
-- HTTP clients: create once, reuse, set explicit `Timeout`; configure the `Transport` pool (`MaxIdleConns`, `MaxIdleConnsPerHost`, `IdleConnTimeout`, `TLSHandshakeTimeout`). Use `http.NewRequestWithContext`; size-limit response bodies with `io.LimitReader`.
+- HTTP clients: create once, reuse, set explicit `Timeout`; configure the `Transport` pool (`MaxIdleConns`, `MaxIdleConnsPerHost`, `IdleConnTimeout`, `TLSHandshakeTimeout`). Use `http.NewRequestWithContext`; size-limit response bodies with `io.LimitReader`. Always close `resp.Body`. Before 1.27, HTTP/1 reuses a connection only if the body was read to EOF, so drain a bounded amount first (`io.Copy(io.Discard, io.LimitReader(resp.Body, n))`; a longer body forfeits reuse); HTTP/2 needs no drain, and 1.27+ HTTP/1 `Close` drains up to a limit itself.
 - HTTP servers: set `ReadHeaderTimeout` (defeats Slowloris), `ReadTimeout`, `WriteTimeout` (omit or override per-handler for streaming), `IdleTimeout`.
 - Health: split `/healthz` (process liveness, no external deps — or k8s restarts you for nothing) from `/readyz` (dependency readiness, e.g. `db.PingContext`).
 - Retries: idempotent only, bounded attempts, exponential backoff capped then *fully* jittered (`rand` across the whole interval, not added to it); wait on a timer inside a `select` against `<-ctx.Done()` (stop the timer and return `ctx.Err()` on cancel). Skip permanent failures via an `isRetryable` check (heuristic in Errors).
-- Graceful shutdown: `signal.NotifyContext` for SIGINT/SIGTERM; run `ListenAndServe` in a goroutine that normalizes `http.ErrServerClosed` to nil and reports on a buffered error channel; `select` on the signal *and* that channel — the server can die on its own (bind failure). On signal, `srv.Shutdown` under a bounded `context.WithTimeout` to drain, then close dependencies in reverse startup order, aggregating with `errors.Join`.
+- Graceful shutdown: `signal.NotifyContext` for SIGINT/SIGTERM (1.26+: `context.Cause(ctx)` names the signal received); run `ListenAndServe` in a goroutine that normalizes `http.ErrServerClosed` to nil and reports on a buffered error channel; `select` on the signal *and* that channel — the server can die on its own (bind failure). On signal, `srv.Shutdown` under a bounded `context.WithTimeout` to drain, then close dependencies in reverse startup order, aggregating with `errors.Join`.
 - Streaming (SSE/long-poll/chunked): `http.NewResponseController(w)` (1.20+) for flush, per-response deadlines (`SetReadDeadline`/`SetWriteDeadline`), and `Hijack` — it walks writer wrappers implementing `Unwrap() http.ResponseWriter`, unlike `w.(http.Flusher)` assertions; unsupported ops return an error matching `http.ErrNotSupported` (`errors.Is`) — fall back gracefully.
-- Observability: `log/slog` (JSON handler, `slog.With` for scoped fields, `LogAttrs` in hot paths to avoid variadic allocation); OpenTelemetry + `otelhttp` for traces/metrics; `net/http/pprof` in dev/staging only (never a public port).
+- Observability: `log/slog` (JSON handler, `slog.With` for scoped fields, `LogAttrs` in hot paths to avoid variadic allocation, `slog.NewMultiHandler` (1.26+) to fan one logger out to several handlers); OpenTelemetry + `otelhttp` for traces/metrics; `net/http/pprof` in dev/staging only (never a public port).
 
 ## Modules
 
@@ -184,13 +192,16 @@ Write Go that a senior Go engineer would ship to production. This file is self-c
 
 - **1.21+:** `slices`/`maps` (`Sort`, `SortFunc`, `Contains`, `BinarySearch`, `Clone`, `Copy`, `DeleteFunc`) replace `samber/lo`; `min`/`max`/`clear` builtins; `cmp.Compare` replaces hand-rolled comparators; `log/slog` replaces logrus/zap.
 - **1.22+:** `range` over ints (`for i := range 10`).
-- **1.23+:** iterators (`iter.Seq`/`Seq2`, range-over-func — shape: `func All() iter.Seq2[K,V] { return func(yield func(K,V) bool) { ... } }`); `slices.Collect`/`Values`/`All` and `maps.Keys`/`Values`/`Collect` bridge them (`maps.Keys`/`Values` return iterators — materialize with `slices.Collect`/`slices.Sorted`); timer channels are unbuffered and unreferenced timers are GC-collectible — `time.After` in loops no longer leaks, no stale tick can arrive after `Stop`/`Reset`, and the old drain-after-`Stop` pattern is obsolete (it now blocks); pre-1.23 semantics still require `Stop()` + draining stale ticks in select loops; `unique` (`unique.Make` returns a comparable `Handle[T]` — pointer-equality comparison; saves memory when many equal values repeat).
+- **1.23+:** iterators (`iter.Seq`/`Seq2`, range-over-func — shape: `func All() iter.Seq2[K,V] { return func(yield func(K,V) bool) { ... } }`); `slices.Collect`/`Values`/`All` and `maps.Keys`/`Values`/`Collect` bridge them (`maps.Keys`/`Values` return iterators — materialize with `slices.Collect`/`slices.Sorted`); timer channels are unbuffered and unreferenced timers are GC-collectible — `time.After` in loops no longer leaks, no stale tick can arrive after `Stop`/`Reset`, and the old drain-after-`Stop` pattern is obsolete (it now blocks); a pre-1.23 `go` directive built by a pre-1.27 toolchain keeps the old semantics, which require `Stop()` + draining stale ticks in select loops; `unique` (`unique.Make` returns a comparable `Handle[T]` — pointer-equality comparison; saves memory when many equal values repeat).
 - **1.24+:** tool directives in `go.mod` (a `tool (...)` block) replace `tools.go`, run via `go tool <name>`; `weak` (`weak.Pointer[T]` for canonicalization caches that must not prevent GC).
 - **1.25+:** `sync.WaitGroup.Go` (see Concurrency); `testing/synctest` stable (see Testing).
+- **1.26+:** `new(expr)` allocates an initialized variable (`Age: new(yearsSince(born))`) — replaces `ptr[T]`/`aws.String`/`lo.ToPtr` helpers for optional pointer fields; `errors.AsType` (see Errors); `slog.NewMultiHandler` (see Building a long-running service); self-referential constraints (see Project layout).
+- **1.27+:** generic methods (see Project layout); promoted-field keys in struct literals (see Style); `encoding/json/v2` (see JSON); `uuid` for new IDs — `uuid.New()` (currently v4) for opaque IDs, `uuid.NewV7()` for time-ordered, index-friendly keys (it reveals creation time); keep `github.com/google/uuid` where code needs V1/V3/V5/V6 generation or `NullUUID`; `strings.CutLast`/`bytes.CutLast` replace `LastIndex` slicing.
 - `fmt.Errorf("...%w", err)` + `errors.Is`/`As` replaces `pkg/errors` wrapping — but not its stack capture; if the project formats stacks with `%+v`, plan a replacement first. `//go:embed` (`embed.FS`, which implements `io/fs.FS`) for static assets, migrations, templates.
 
 ## Tooling & CI (run on every commit)
 
 - `go vet ./...`, `go test -race -cover ./...`, `golangci-lint run`, `govulncheck ./...`.
+- After bumping the `go` directive, run `go fix ./...` (1.26+; `-diff` to preview) to rewrite code to that version's idioms, then review the diff.
 - Pin `setup-go` to `go-version-file: go.mod` so CI matches the module's Go version — no drift.
 - `.golangci.yml`: start with errcheck/govet/ineffassign/staticcheck/unused/gosec/revive/gocritic/misspell/nestif/gocognit/exhaustive; don't enable everything (false positives drown real issues). Exclude `vendor`/`testdata`. `//nolint` is a last resort.
