@@ -109,7 +109,7 @@ Check for: fuzzy in/out-of-scope boundary, a split trigger met without a split, 
 <findings>
 
 ## Open questions
-Check for: questions that block execution but are marked no, questions marked yes that block nothing, questions missing owner or due date, questions the plan or the repository already answers.
+Check for, among questions with a blank Resolution: ones that block execution but are marked no, ones marked yes that block nothing, ones missing an owner or due date, ones the plan or the repository already answers.
 
 <findings>
 

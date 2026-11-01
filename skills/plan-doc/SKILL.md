@@ -8,12 +8,17 @@ disable-model-invocation: true
 
 ## Behavior
 
-1. **Gather context.** You need two answers from the user: what is being built, and why it matters now. Ask only when one is missing; if the user cannot answer, stop and report what is missing. Then read the code, tests, and docs the change touches and cite their paths in the plan. Record every other unknown as an Assumption or an Open Question.
+1. **Gather context.** You need two answers from the user: what is being built, and why it matters now. Ask only when one is missing; if the user cannot answer, stop and report what is missing. Then read the code, tests, and docs the change touches and cite their paths in the plan. Record every other unknown: a choice where one option is no worse than the others on correctness, risk, effort, and fit with the repository goes in Key decisions; an unknown whose answer changes a step, the design, or the scope is an Open Question; anything else is an Assumption.
 2. **Decide whether to split.** Each plan must be mergeable as a standalone PR. Split when the plan has more than 10 implementation steps, spans more than two separately built, deployed, or owned components, or contains work that cannot start until another part has shipped. Order the plans so every prerequisite precedes its dependents; each plan names its prerequisites in `Depends on` and its siblings in References.
 3. **Derive type and slug.** Type is the `git-conventions` commit type of the plan's dominant change: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore`; ask when it is not obvious. Slug, in the `git-conventions` slug format: lowercase the subject, replace every run of characters outside `[a-z0-9]` with one hyphen, trim hyphens, keep the first five words; ask if the result is empty. Each split plan gets its own slug.
 4. **Name the file.** Plans live in `<root>/.agents/plans/`, where `<root>` is `git rev-parse --show-toplevel`, or the working directory outside a git repository. A single plan is `$(date -u +%Y%m%d%H%M%S)-<slug>.md`. A split set shares one timestamp and adds a two-digit sequence in execution order: `<timestamp>-01-<slug>.md`, `<timestamp>-02-<slug>.md`, ….
 5. **Write the plan.** Run `mkdir -p <root>/.agents/plans`, then fill the template below. Its prompts are instructions to you: replace them with content and never copy them into the plan.
-6. **Report.** List each written path with a one-line summary, in execution order, and name `plan-review` as the next step. Do not reproduce plan content in chat.
+6. **Resolve open questions.** Skip when no plan lists a question in section 9. Otherwise:
+   - Send every question in one message, Blocking first, numbered Q1, Q2, …; a question several plans share is one Q naming each file.
+   - For each, give the plan files, the question and the plan text it affects, quoted, and what depends on the answer. For a choice, give the options with tradeoffs and your recommendation with its basis; with no basis, say so and recommend the more reversible option. For a fact, say what answer is needed. The user may defer any question.
+   - Wait for the reply. Fill each answered Resolution, in every plan that carries the question, with the decision in one self-contained sentence, and add a Key decisions row for each design choice. A question the reply leaves unanswered is deferred and keeps a blank Resolution. A choice an answer leaves open becomes a new row, never a second round.
+   - Rewrite every other section of the affected plans as if the answers had been known from the start; keep every section 9 row, in each plan it concerns. Then re-check step 2: when the split, a Type, or a Slug changes, redo steps 3–5 for the whole set under its original timestamp, then delete each earlier file whose name the new set does not use; otherwise edit the files in place.
+7. **Report.** List each written path with a one-line summary, in execution order, and how many questions were answered and deferred; name `plan-review` as the next step. Outside step 6's questions, do not reproduce plan content in chat.
 
 ## Plan Template
 
@@ -27,7 +32,7 @@ In section 5, Overview and Key decisions are required. The three code subsection
 
 Code appears only inside those three subsections and shows minimal external contracts or structural skeletons, never full implementations.
 
-In section 6, no step is larger than M; decompose anything bigger. Section 6 schedules all the work: every test section 7 names and every code-level item in section 8 (migrations, flags, rollback hooks) belongs to the step that introduces the behaviour it covers, because plan-implement executes steps, not prose. In section 9, Blocking is `yes` or `no` and Resolution stays blank until the question is resolved.
+In section 6, no step is larger than M; decompose anything bigger. Section 6 schedules all the work: every test section 7 names and every code-level item in section 8 (migrations, flags, rollback hooks) belongs to the step that introduces the behaviour it covers, because plan-implement executes steps, not prose. In section 9, Blocking is `yes` when a step depends on the answer, otherwise `no`, and Resolution stays blank until the question is resolved.
 
 ---
 
