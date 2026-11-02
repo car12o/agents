@@ -49,7 +49,8 @@ It ships four things:
 │   └── git-flow/SKILL.md
 ├── tools/                        # Standalone shell scripts installed onto PATH
 │   ├── agents-mcp.sh
-│   └── git-release.sh
+│   ├── git-release.sh
+│   └── pull-repos.sh
 └── statusline/
     └── statusline-command.sh     # Claude Code statusline renderer
 ```
@@ -72,8 +73,8 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | `bubblewrap`, `socat` | `ask-agent`'s `claude` agent | Claude Code's Bash sandbox on Linux; without them the `claude` call fails, since the sandbox is required |
 | `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` MCP server |
 | Node.js (`npx`) | the MCP config produced by `agents-mcp` | runs the `playwright` MCP server |
-| `git` | `git-release`, `git-flow`, statusline | release branching, feature branching, branch display |
-| `gh` | `git-flow`, `multi-code-review` | opens PRs, reads PR title/body/comments |
+| `git` | `git-release`, `pull-repos`, `git-flow`, statusline | release branching, fast-forward pulls, feature branching, branch display |
+| `gh` | `git-flow`, `multi-code-review`, `pull-repos` | opens PRs, reads PR title/body/comments; optional for `pull-repos`, which shows skipped repositories' PR status with it |
 
 > The installer **skips** any agent whose config directory does not exist, printing a `WARNING` instead of failing. You can have only Claude installed and `make install` will still work — it just won't touch Codex or OpenCode.
 
@@ -244,6 +245,22 @@ git-release <patch|minor|major>
 - Resolves the repository's default branch (from `origin/HEAD`, falling back to `git remote show origin`), switches to it, and pulls fast-forward only.
 - Reads the latest tag via `git describe --tags --abbrev=0`, extracts its `MAJOR.MINOR.PATCH` component (so `v1.2.3` works), bumps the requested part, then creates and pushes a `release/<new-version>` branch from `origin/<default-branch>`.
 - Errors out if the default branch cannot be determined, there are no tags, or the latest tag does not contain a `MAJOR.MINOR.PATCH` version.
+
+### `pull-repos`
+
+Fast-forwards every repository under a directory that is checked out on its default branch, and reports the rest.
+
+```bash
+pull-repos [ROOT]
+```
+
+- Covers each immediate subdirectory of `ROOT` (default: the current directory) that has a `.git` directory, all in parallel.
+- The default branch is the one `origin/HEAD` names locally; `git remote set-head origin --auto` refreshes it.
+- A repository on its default branch gets `git pull --ff-only`. One on any other branch, on a detached HEAD, or without `origin/HEAD` is skipped: no pull, checkout, or stash.
+- Pulls never prompt. A pull that would ask for credentials, an SSH key passphrase, or a host-key confirmation fails instead. Credentials have to come from a credential helper or `ssh-agent`, and hosts have to be in `known_hosts`.
+- Each skipped repository shows its branch and worktree state. For a branch, it also shows the latest PR from `gh`: open, with its review and merge state, or merged and ready to switch back to the default branch.
+- The report groups repositories into Up to date, Updated (with the diffstat), Skipped, and Failed (with git's error), then prints a summary line. Colour is on when stdout is a terminal; `NO_COLOR` turns it off.
+- **Exit codes:** `0` no pull failed · `1` a pull failed, or `ROOT` holds no repositories.
 
 ---
 
