@@ -388,9 +388,10 @@ opencode_resume() {
 # OpenCode loads the user's and the project's config, instructions, skills, and MCP servers; this inline config
 # outranks both. It has no OS sandbox, so its agent allows every tool, MCP servers, skills, and reads anywhere included,
 # except edits, questions, sub-agents, and the browser; its shell runs only git read commands, without --output or
-# redirects. The top-level edit denial replaces any edit allowance in the user's config, whose rules apply after
-# the agent's. The web search provider is preselected because otherwise the first search asks for consent on a
-# form that `opencode run` cancels, failing the search and exiting 1.
+# redirects. Rules apply in order, the last match winning: the user's and the project's, this config's top level,
+# then the agent's. The top-level edit denial follows the user's rules by config precedence alone, so edits stay
+# denied even if the agent's rules stop coming last. The web search provider is preselected because otherwise the
+# first search asks for consent on a form that `opencode run` cancels, failing the search and exiting 1.
 opencode_config() {
   jq -cn --args '
     ($ARGS.positional | map(
