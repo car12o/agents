@@ -1,6 +1,6 @@
 ---
 name: git-conventions
-description: Default-branch resolution, branch naming and creation, writing for reviewers, Conventional Commits, commit hygiene, and push, pull request, and attribution rules. Use before creating a branch, committing, pushing, or opening a pull request.
+description: Default-branch resolution, branch naming and creation, writing for reviewers, Conventional Commits, commit hygiene, folding a change into the branch commit it corrects, and push, pull request, and attribution rules. Use before creating a branch, committing, amending, pushing, or opening a pull request.
 ---
 
 # Skill: git-conventions
@@ -52,18 +52,28 @@ Message, per [Conventional Commits](https://www.conventionalcommits.org/):
 - Subject: `<type>(<scope>): <summary>` — imperative, lowercase after the colon, no trailing period, at most 72 characters. The scope is the lowercase component name, as earlier commits name it (`git log --format=%s`), only when the change is confined to one component.
 - Body, after a blank line and wrapped at 72 columns, when the subject cannot carry the why.
 - Breaking change: `!` before the colon and a `BREAKING CHANGE: <what breaks and how to migrate>` footer.
-- Pass multi-line text through a file (`git commit -F <file>`) or repeated `-m` flags, never as `\n` inside a quoted argument.
+- Pass multi-line text through a file outside the repository (`git commit -F <file>`) or repeated `-m` flags, never as `\n` inside a quoted argument.
 
 Rules:
 
-- Never commit on `<default>` or a detached HEAD unless the user explicitly asks for it; when they have not, stop and ask. Never amend, rebase, or reset commits that existed before this task unless the user asks.
-- One logical change per commit, each meant to build on its own; the calling skill decides which checks run before committing. Split a change set that holds several.
+- Never commit on `<default>` or a detached HEAD unless the user explicitly asks for it; when they have not, stop and ask.
+- One logical change per commit, each meant to build on its own; the calling skill decides which checks run before committing. Split a change set that holds several. A change that corrects or completes one of the branch's own commits is folded into that commit (next section), never committed on top of it; on `<default>`, fold only when the user asks.
 - Commit only the task's paths: those you changed for it, or exactly the staged set when the user prepared it. Stage each path explicitly (`git add <path>` also stages a deletion), then confirm `git diff --cached --name-only` lists only those paths; if it lists others, stop and ask. Never `git add -A`, `git add .`, `git add -u`, or `git commit -a`.
 - If a commit hook fails, or `git status --porcelain -- <committed paths>` prints anything after the commit, a hook rewrote them: stop and report, leaving the changes in place. Never `--no-verify`.
+- Rewrite the branch's own commits only by folding; reorder, squash together, reword alone, or reset them only when the user asks. Never rewrite a commit on `origin/<default>`, a merge commit, or a commit by another author; the folding guard checks the last two.
+
+## Folding a change into its commit
+
+A content change belongs to one of the branch's own commits when it corrects or completes what that commit introduced and needs nothing a later branch commit introduces: a review finding's fix, a missed file or test, a wrong name. A change that adds something new, even to the same code, is a new commit; a message-only correction is a reword, done only when the user asks, as the `amend!` commit below with `--allow-empty`. List the branch commits that touched a path with `git log --format='%H %s' origin/<default>..HEAD -- <path>`, or every branch commit (without `-- <path>`) for a path none touched, and confirm the target `<sha>` by reading its diff; when no commit clearly owns the change, stop and ask. Resolve `<sha>` afresh for every fold: a fold changes the hashes after the target.
+
+Fold one change at a time, with only its paths staged; a file whose hunks belong to different commits: stop and ask. The staging, index, and hook rules above apply to the commits below. Decide whether the target's message still describes the result per Writing for reviewers; when it does not, write the whole new message to `<file>`. A fold rewrites `<range>` = `<sha>^..HEAD`, the target and every commit after it. Before it, `git log --merges <range>` must print nothing, `git log --format=%ae <range>` must print only `git config user.email`, and `git log --format=%s <range>` must list no `fixup!`, `squash!`, or `amend!` subject; otherwise stop and ask.
+
+- Target is `HEAD`: `git commit --amend --no-edit`, or `git commit --amend -F <file>`.
+- Target is earlier: `git commit -m 'fixup! <sha>'`, or, to replace the message too, `git commit -F <file>` with `<file>` starting with the line `amend! <sha>` and a blank line; autosquash resolves both by hash. Then `git rebase --autosquash --autostash --no-update-refs <sha>^` (git 2.44 or later): it replays `<range>` onto the target's parent and needs no `-i`. If it stops on a conflict, `git rebase --abort`, then `git reset --soft HEAD^` to return the change to the index, and stop and ask. If it completes but prints `Applying autostash resulted in conflicts`, the fold is done and the stashed edits are in `git stash list`: stop and report, never reset. On any other failure, stop and report. Afterwards `git log --format=%s <range>` must list no `fixup!` or `amend!` subject; if it does, stop and report, leaving the commit in place.
 
 ## Pushes
 
-Push with `git push -u origin HEAD`. Never push `<default>` unless the user explicitly asks for it; when they have not, stop and ask. If the push fails for any reason, including a pre-push hook, stop and report; never `--force`, `--force-with-lease`, `--no-verify`, rebase, or merge to make it succeed.
+Push with `git push -u origin HEAD`. When `origin/<branch>` exists (`git rev-parse --verify --quiet refs/remotes/origin/<branch>` exits 0; `<branch>` is `git branch --show-current`) and is not an ancestor of `HEAD` (`git merge-base --is-ancestor origin/<branch> HEAD` exits 1), the branch was rewritten: push with `git push -u --force-with-lease --force-if-includes origin HEAD` instead. It replaces the remote branch only while it still points where this clone last fetched it and that tip was once this branch's own; a rejection (`stale info`, `remote ref updated since checkout`) means the remote branch moved or holds history this clone never had, so stop and ask. Never push `<default>` unless the user explicitly asks for it; when they have not, stop and ask. If a push fails for any other reason, including a pre-push hook, stop and report; never `--force`, `--no-verify`, rebase, or merge to make it succeed.
 
 ## Pull requests
 

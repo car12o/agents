@@ -34,11 +34,11 @@ Derive `<type>` and `<slug>` from the staged diff, or from what the user asked f
 Commit the staged changes as the user prepared them: do not run checks, edit files, or stage anything that was not staged.
 
 - Read the staged diff (`git diff --cached`) to understand what is being committed.
-- Commit per `git-conventions`. To split the staged set into one commit per logical change, unstage whole paths (`git restore --staged`) and re-stage each group by path, so the commits together equal the staged set. Never `git commit -- <path>`: it commits working-tree content. If a file to be split also has unstaged changes, or holds several logical changes, stop and ask.
+- Commit per `git-conventions`. To split the staged set into one commit per logical change, unstage whole paths (`git restore --staged`) and re-stage each group by path, so the commits together equal the staged set; a group that corrects or completes one of the branch's own commits is folded into it. Never `git commit -- <path>`: it commits working-tree content. If a file to be split also has unstaged changes, or holds several logical changes, stop and ask.
 
 ## Step 3 — pull request
 
-Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL, say when the push added commits its body predates, and stop. Otherwise:
+Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, report its URL, say when the push added or rewrote commits after its body was written, and stop. Otherwise:
 
 1. Write the title, and write the body to `<file>`, per `git-conventions`, from `git log origin/<default>..HEAD`, `git diff origin/<default>...HEAD`, this session's record of the task and of the checks you saw run, and what the user reported. Read a plan only when the user passed one, and only for the problem, decisions, and rejected alternatives: a plan records intent, so the commits win where they disagree, and its `Verify` steps and Testing Strategy are not checks that ran.
 2. Open the PR with `gh pr create --base <default> --title … --body-file <file>`, adding `--attach` for each screenshot or recording per `git-conventions`, and report its URL.

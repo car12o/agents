@@ -35,7 +35,7 @@ Run the project's checks once before the first step; report failures already pre
 
 1. Make the changes the step describes, including the tests Testing Strategy assigns to them. If Testing Strategy names tests no step covers, add them in the step that introduces the behaviour and report the deviation.
 2. Check the step's `Verify` condition and run the relevant tests, type-check, or lint. Do not commit until they pass. Fix failures within the step's intent; a fix that would change the plan's intent is a blocker. Report a Verify you cannot check locally as unverified.
-3. Commit per `git-conventions`, staging only this step's files. A step that changes nothing is not committed. Never commit the plan doc (`.agents/plans/…`).
+3. Commit per `git-conventions`, staging only this step's files; a fix to an earlier step's code is folded into that step's commit first. A step that changes nothing is not committed. Never commit the plan doc (`.agents/plans/…`).
 
 If a step cannot be completed as written, see Handling blockers.
 
@@ -43,7 +43,7 @@ If a step cannot be completed as written, see Handling blockers.
 
 Confirm `git status` shows nothing uncommitted outside `.agents/plans/`, then report:
 
-- One line per step: number, title, and its commits, or why it was skipped or not requested. Do not quote plan content.
+- One line per step: number, title, and its commits as `git log --format='%h %s' origin/<default>..HEAD` lists them at report time, or why it was skipped or not requested. Do not quote plan content.
 - Checks run and their results, and any Verify left unverified.
 - Success criteria: which are met and how you checked; the rest as unverified.
 - Deviations from the plan and why.
