@@ -67,11 +67,12 @@ The installer itself only needs `make` and a POSIX shell. The individual agents 
 | Claude Code (`claude`) | `install-claude`, the `ask-agent` skill's `claude` agent | reads `~/.claude/CLAUDE.md` and `~/.claude/skills` |
 | Codex (`codex`) | `install-codex`, the `ask-agent` skill's `codex` agent | reads `~/.codex/AGENTS.md` and `~/.codex/skills` |
 | OpenCode (`opencode`) | `install-opencode`, the `ask-agent` skill's `glm/minimax/kimi/qwen/deepseek/grok/gemini` agents | reads `~/.config/opencode` |
-| `jq` 1.7+ | `agents-mcp`, `ask-agent`, statusline | JSON parsing / TOML generation; `ask-agent` needs `--raw-output0` |
+| `jq` 1.7+ | `agents-mcp`, `ask-agent`, statusline | JSON parsing and editing; `ask-agent` needs `--raw-output0` |
 | `perl` | `ask-agent` | strips `<think>…</think>` blocks from responses |
+| `python3` 3.11+ | `agents-mcp` | reads, edits, and checks `.codex/config.toml` with the standard library's `tomllib`, and recognises `opencode.json` files with comments |
 | `timeout`, `flock`, `env --default-signal` | `ask-agent` | coreutils and util-linux: the call's time limit, the one-turn-per-run lock, and SIGINT for background launches |
 | `bubblewrap`, `socat` | `ask-agent`'s `claude` agent | Claude Code's Bash sandbox on Linux; without them the `claude` call fails, since the sandbox is required |
-| `docker` | the MCP config produced by `agents-mcp` | runs the `postgres-mcp` MCP server |
+| `docker` | the MCP config produced by `agents-mcp`, `agents-mcp pull` | runs the `postgres`, `grafana`, and `elastic` MCP servers |
 | Node.js (`npx`) | the MCP config produced by `agents-mcp` | runs the `playwright` MCP server |
 | `git` 2.44+ | `git-conventions`, `git-release`, `pull-repos`, `git-flow`, statusline | folding by non-interactive autosquash (needs 2.44), release branching, fast-forward pulls, feature branching, branch display |
 | `gh` | `git-flow`, `multi-code-review`, `pull-repos` | opens PRs, reads PR title/body/comments; optional for `pull-repos`, which shows skipped repositories' PR status with it |
@@ -219,20 +220,29 @@ Standalone shell scripts symlinked onto your `PATH` (extension stripped) by `mak
 
 ### `agents-mcp`
 
-Manages a project-local **MCP server config** in the current working directory. JSON is the single source of truth; the Codex TOML and opencode JSON are derived from it at runtime via `jq`.
+Manages the **MCP servers** of the project in the current working directory, for Claude Code, Codex, and opencode at once. Each server is defined once in the script's catalog, as Claude Code JSON, and converted for the other two with `jq`.
 
 ```bash
-agents-mcp add [-m|--mcp <name>]... [-u|--uri <database-uri>] [-e|--executable-path <path>] [-a|--attach]
-agents-mcp rm
+agents-mcp <mcp> [options]
+agents-mcp rm [<mcp>...]
+agents-mcp ls
+agents-mcp pull [<mcp>...]
+agents-mcp [<mcp>] -h
 ```
 
-- `add` — writes `.mcp.json` (Claude Code format), `.codex/config.toml` (Codex format), and `opencode.json` (opencode format) into the current directory. Two MCP servers are bundled:
-  - `postgres` — `crystaldba/postgres-mcp` via Docker, in **unrestricted** access mode, with `DATABASE_URI` defaulting to `postgres://human_ro@0.0.0.0:5432/database`. Override it with `-u/--uri`.
-  - `playwright` — `@playwright/mcp@latest` via `npx`, driving the browser executable at `/usr/bin/brave` (Brave). Override it with `-e/--executable-path`. By default it launches a new browser; `-a/--attach` makes it attach to the browser you already have running instead, with its tabs and logged-in sessions. Attaching needs the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) installed in that browser, and you approve each connection in the tab it opens.
-
-  All servers are included by default; pass `-m/--mcp <name>` (repeatable) to include only a subset. `--uri` is rejected unless `postgres` is among the selected servers, and `--executable-path` and `--attach` unless `playwright` is.
-- `rm` — removes all generated files and the `.codex` directory if left empty.
-- **Exit codes:** `0` success · `1` bad usage, missing `jq`, or `rm` with no file present.
+- `<mcp> [options]` — adds one server to `.mcp.json` (Claude Code), `.codex/config.toml` (Codex), and `opencode.json` (opencode), creating the files as needed. Servers accumulate across calls. Adding a server that is already there replaces it, so an option left out goes back to its default, and a required option must be given again. Each server has its own options, listed by `agents-mcp <mcp> -h`:
+  - `postgres` — `crystaldba/postgres-mcp` via Docker, in **unrestricted** access mode. `-u/--uri` sets `DATABASE_URI`, default `postgres://postgres@localhost:5432/postgres`.
+  - `grafana` — `grafana/mcp-grafana` via Docker. `-u/--url` sets `GRAFANA_URL`, default `http://localhost:3000/`. No credentials are set.
+  - `elastic` — `docker.elastic.co/mcp/elasticsearch` (v0.4+, for Elasticsearch 8 and 9) via Docker. `-u/--url` sets `ES_URL` and `-k/--api-key` sets `ES_API_KEY`. Both are required and have no default. The key is written in plain text into the three files, so keep them out of version control. Elastic has deprecated this server in favour of the Agent Builder MCP endpoint of Elastic 9.2+, and ships only critical security fixes for it.
+  - `playwright` — `@playwright/mcp@latest` via `npx`. `-e/--executable-path` sets the browser executable it drives, default `/usr/bin/brave` (Brave). By default it launches a new browser; `-a/--attach` makes it attach to the browser you already have running instead, with its tabs and logged-in sessions. Attaching needs the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) installed in that browser, and you approve each connection in the tab it opens.
+- `rm [<mcp>...]` — removes the named servers, or, with no name, every MCP server in the three files, including ones added by other means. It fails when a named server is not configured, or when there is nothing to remove.
+- Only the MCP server entries change. Other settings in the three files are kept, and a file is deleted once nothing else is left in it, along with `.codex/` if it ends up empty. Nothing is written when any of the three cannot be parsed or edited safely:
+  - `.codex/config.toml`: a server's tables are replaced where they stand, comments directly above a table stay with it, and the edited file is re-read with `tomllib` and must differ from the old one only in the edited servers. A server written as an inline table or with dotted keys fails that check, so it has to be changed by hand.
+  - `opencode.json`: servers go under `mcp.servers` when the file already uses that opencode 2 layout, and directly under `mcp` otherwise; `mcp.timeout` is never treated as a server. A file with comments or trailing commas is refused, since rewriting it would drop them.
+- `ls` — lists the catalog's servers and every server configured in the three files. A configured server shows its settings, with passwords and API keys masked and defaults marked. A server missing from one of the files is flagged, since the agent reading that file will not see it.
+- `pull [<mcp>...]` — runs `docker pull` for the named servers' images, or for all of the catalog's Docker images; `playwright` has none. `docker run` only pulls a missing image, so this is how a server gets updated.
+- Colour is on when stdout is a terminal; `NO_COLOR` turns it off.
+- **Exit codes:** `0` success · `1` bad usage, missing `jq`, `python3`, or `docker`, a config file it cannot parse or edit safely, nothing to remove, or a failed pull.
 
 ### `git-release`
 
