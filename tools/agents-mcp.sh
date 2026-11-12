@@ -38,7 +38,8 @@ declare -rA FILES=([claude]=.mcp.json [codex]=.codex/config.toml [opencode]=open
 # its Docker image. Each flag changes the template in one of three ways: "env"
 # sets that env var, "after" replaces the arg that follows the named one, and
 # "append" (a switch) appends that arg. A "required" flag has no default and
-# must be given; a "secret" one is never printed.
+# must be given; a "secret" one is never printed; a flag cannot be given with
+# the flags its "conflicts" lists.
 readonly CATALOG='{
   "elastic": {
     "about": "Elasticsearch, through docker.elastic.co/mcp/elasticsearch in Docker.",
@@ -77,7 +78,9 @@ readonly CATALOG='{
       {"short": "-e", "long": "--executable-path", "value": "path", "after": "--executable-path",
        "help": "Browser executable to drive."},
       {"short": "-a", "long": "--attach", "append": "--extension",
-       "help": "Attach to your running browser (needs the Playwright Extension)."}
+       "help": "Attach to your running browser (needs the Playwright Extension)."},
+      {"short": "-i", "long": "--isolated", "append": "--isolated", "conflicts": ["--attach"],
+       "help": "Keep the browser profile in memory, so several agents can each run a browser."}
     ]
   },
   "postgres": {
@@ -450,6 +453,14 @@ missing_flags() {  # missing_flags NAME VALUES
     '[.[$name].flags[] | select(.required and $values[.long] == null) | .long] | join(", ")' <<<"$CATALOG"
 }
 
+# Prints the first two flags in VALUES, an object keyed by long flag, that
+# NAME's catalog marks as conflicting, as "<long> and <long>"; empty when none.
+conflicting_flags() {  # conflicting_flags NAME VALUES
+  jq -r --arg name "$1" --argjson values "$2" '
+    first(.[$name].flags[] | select($values[.long] != null) | .long as $long
+          | .conflicts[]? | select($values[.] != null) | "\($long) and \(.)") // ""' <<<"$CATALOG"
+}
+
 # Prints the options set in SERVER, NAME's server JSON, on one line, such as
 # "uri postgres://… (default) · attach", with passwords and secrets masked.
 settings_line() {  # settings_line NAME SERVER
@@ -473,7 +484,8 @@ mcp_block() {  # mcp_block NAME
     | "  \($bold)\($name)\($reset)  \($mcp.about)",
       ( $mcp.flags[] as $flag
         | "    \($flag | flag_usage | pad($width))   \($flag.help)",
-          ( if $flag.required then "Required." else $mcp.server | setting($flag) | strings | "Default: \(.)" end
+          ( (if $flag.required then "Required." else $mcp.server | setting($flag) | strings | "Default: \(.)" end),
+            ($flag.conflicts // empty | "Not with \(join(", ")).")
             | "    \("" | pad($width))   \($dim)\(.)\($reset)" ) )' <<<"$CATALOG"
 }
 
@@ -673,7 +685,7 @@ names_only() {  # names_only COMMAND ARG...
 }
 
 add_server() {  # add_server NAME [OPTION]...
-  local name=$1 spec long values='{}' missing server verb=Added format
+  local name=$1 spec long values='{}' missing conflict server verb=Added format
   local hint=$'\n'"Run '$PROG $name -h' for its options."
   shift
   while (($#)); do
@@ -691,6 +703,8 @@ add_server() {  # add_server NAME [OPTION]...
   done
   missing=$(missing_flags "$name" "$values")
   [[ -z $missing ]] || die "$name requires $missing.$hint"
+  conflict=$(conflicting_flags "$name" "$values")
+  [[ -z $conflict ]] || die "$name cannot take both $conflict.$hint"
 
   server=$(render_server "$name" "$values")
   load_configs
