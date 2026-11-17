@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## Behavior
 
-1. **Gather context.** You need two answers from the user: what is being built, and why it matters now. Ask only when one is missing; if the user cannot answer, stop and report what is missing. Then read the code, tests, and docs the change touches and cite their paths in the plan. Record every other unknown: a choice where one option is no worse than the others on correctness, risk, effort, and fit with the repository goes in Key decisions; an unknown whose answer changes a step, the design, or the scope is an Open Question; anything else is an Assumption.
+1. **Gather context.** You need two answers from the user: what is being built, and why it matters now. Ask only when one is missing; if the user cannot answer, stop and report what is missing. Then read the code, tests, and docs the change touches, and what it alters or makes stale elsewhere (callers, consumers, integrations, data, configs, docs), and cite their paths in the plan. Record every other unknown: a choice where one option is no worse than the others on correctness, risk, effort, and fit with the repository goes in Key decisions; an unknown whose answer changes a step, the design, or the scope is an Open Question; anything else is an Assumption.
 2. **Decide whether to split.** Each plan must be mergeable as a standalone PR. Split when the plan has more than 10 implementation steps, spans more than two separately built, deployed, or owned components, or contains work that cannot start until another part has shipped. Order the plans so every prerequisite precedes its dependents; each plan names its prerequisites in `Depends on` and its siblings in References.
 3. **Derive type and slug.** Type is the `git-conventions` commit type of the plan's dominant change: `feat`, `fix`, `refactor`, `docs`, `test`, or `chore`; ask when it is not obvious. Slug, in the `git-conventions` slug format: lowercase the subject, replace every run of characters outside `[a-z0-9]` with one hyphen, trim hyphens, keep the first five words; ask if the result is empty. Each split plan gets its own slug.
 4. **Name the file.** Plans live in `<root>/.agents/plans/`, where `<root>` is `git rev-parse --show-toplevel`, or the working directory outside a git repository. A single plan is `$(date -u +%Y%m%d%H%M%S)-<slug>.md`. A split set shares one timestamp and adds a two-digit sequence in execution order: `<timestamp>-01-<slug>.md`, `<timestamp>-02-<slug>.md`, ….
@@ -22,6 +22,8 @@ disable-model-invocation: true
 
 ## Plan Template
 
+`Status` records the outcome of the last pipeline skill run on the plan, which overwrites it without a Revision Log line: `draft` (plan-doc), `ready` or `not ready` (plan-review), `in progress` or `implemented` (plan-implement), `code reviewed, risk <level>` or `re-reviewed, risk <level>` (multi-code-review), `PR opened <url>` (git-flow).
+
 All numbered sections are required. When one genuinely does not apply, keep its heading and write `Not applicable — <one-line reason>`. For non-deployed code (libraries, CLIs), section 8 describes the versioning strategy and how breaking changes are communicated.
 
 In section 5, Overview and Key decisions are required. The three code subsections are optional; delete the heading of any you omit, no explanation needed:
@@ -32,13 +34,14 @@ In section 5, Overview and Key decisions are required. The three code subsection
 
 Code appears only inside those three subsections and shows minimal external contracts or structural skeletons, never full implementations.
 
-In section 6, no step is larger than M; decompose anything bigger. Section 6 schedules all the work: every test section 7 names and every code-level item in section 8 (migrations, flags, rollback hooks) belongs to the step that introduces the behaviour it covers, because plan-implement executes steps, not prose. In section 9, Blocking is `yes` when a step depends on the answer, otherwise `no`, and Resolution stays blank until the question is resolved.
+In section 6, no step is larger than M; decompose anything bigger. Section 6 schedules all the work: every test section 7 names and every code-level item in section 8 (migrations, flags, rollback hooks) belongs to the step that introduces the behaviour it covers, and every Affected item in section 3 names the step, or the sibling plan, that handles it, because plan-implement executes steps, not prose. In section 9, Blocking is `yes` when a step depends on the answer, otherwise `no`, and Resolution stays blank until the question is resolved.
 
 ---
 
 ````markdown
 # <Title>
 
+**Status:** draft
 **Type:** <feat | fix | refactor | docs | test | chore>
 **Slug:** <slug>
 **Date:** <date of the filename timestamp, YYYY-MM-DD>
@@ -68,6 +71,9 @@ One paragraph: what is being built and why it matters now.
 
 ### Out of scope
 - Explicitly excluded work.
+
+### Affected
+- Existing code, behaviour, integrations, data, and docs this change alters or makes stale, each cited by path with the step, or the sibling plan, that handles it; or `None — <reason>`.
 
 ## 4. Dependencies & Risks
 

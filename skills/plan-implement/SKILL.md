@@ -16,8 +16,9 @@ root=$(git rev-parse --show-toplevel) && find "$root/.agents/plans" -maxdepth 1 
 
 If the command prints nothing, stop and tell the user: there is no plan, or this is not a git repository. A plan is one of a split set when other plans share its 14-digit timestamp: list the set and start at the lowest sequence whose plan is not yet merged, or ask which to implement. If the user names specific steps, implement only those, in plan order.
 
-Read the plan in full. If a header this skill needs (`Type`, `Slug`, `Depends on`) is missing, ask for it. Then check two gates before modifying any file:
+Read the plan in full. If a header this skill needs (`Type`, `Slug`, `Depends on`) is missing, ask for it. Then check three gates before modifying any file:
 
+- Status: `draft` means the plan was never reviewed: stop, next `plan-review`. On `not ready`, or no Status line, ask the user to confirm that plan-review found the plan ready or that the conditions it left unmet are now met; stop unless they do.
 - Prerequisites: if `Depends on` names other plans, or section 4 names PRs or sign-offs needed before work can proceed, ask the user to confirm each is merged into `<default>` or done. If any is not, stop; when it is a sibling of the same split set, offer to implement it first.
 - Open questions: if any has Blocking `yes` and an empty Resolution, stop and report it.
 
@@ -33,15 +34,15 @@ Load `git-conventions` and resolve `<default>`. Stop and ask if `git status --po
 
 Run the project's checks once before the first step; report failures already present and do not fix them, so they are not mistaken for regressions later. Then work through the plan's Implementation Steps in order. For each step:
 
-1. Make the changes the step describes, including the tests Testing Strategy assigns to them. If Testing Strategy names tests no step covers, add them in the step that introduces the behaviour and report the deviation.
+1. Make the changes the step describes, including the tests Testing Strategy assigns to them and the Affected items in Scope that name this step. If Testing Strategy names tests no step covers, add them in the step that introduces the behaviour and report the deviation. Update anything else the step's change breaks or makes stale — code, integrations, data, docs — in the same step, within its intent, and report it as a deviation the plan missed. Two exceptions: an item the plan assigns to a later step is updated now only when this step's checks need it, and reported as assigned too late; an item Out of scope excludes is left alone and reported as a follow-up, or is a blocker when this step's checks cannot pass without it.
 2. Check the step's `Verify` condition and run the relevant tests, type-check, or lint. Do not commit until they pass. Fix failures within the step's intent; a fix that would change the plan's intent is a blocker. Report a Verify you cannot check locally as unverified.
-3. Commit per `git-conventions`, staging only this step's files; a fix to an earlier step's code is folded into that step's commit first. A step that changes nothing is not committed. Never commit the plan doc (`.agents/plans/…`).
+3. Commit per `git-conventions`, staging only this step's files; a fix to an earlier step's code is folded into that step's commit first. A step that changes nothing is not committed. Never stage the plan in a step's commit.
 
 If a step cannot be completed as written, see Handling blockers.
 
 ## Step 4 — Report
 
-Confirm `git status` shows nothing uncommitted outside `.agents/plans/`, then report:
+Set the plan's `Status` header to `implemented` when every step in section 6 is committed or needed no change, otherwise `in progress`; if git tracks the plan (`git ls-files --error-unmatch <path>` exits 0), commit it in a commit of its own per `git-conventions`. Confirm `git status` shows nothing uncommitted outside `.agents/plans/`, then report:
 
 - One line per step: number, title, and its commits as `git log --format='%h %s' origin/<default>..HEAD` lists them at report time, or why it was skipped or not requested. Do not quote plan content.
 - Checks run and their results, and any Verify left unverified.
@@ -50,7 +51,7 @@ Confirm `git status` shows nothing uncommitted outside `.agents/plans/`, then re
 - Follow-ups: each blocker with the question or action that unblocks it, unresolved Open Questions, and Rollout & Migration actions the steps did not do. Never perform rollout actions.
 - Status: completed, completed with blockers, or stopped.
 
-Do not push or open a pull request; name the branch and `git-flow pr` as the next step. Do not edit, move, or delete the plan file.
+Do not push or open a pull request; name the branch and the next steps: `multi-code-review <plan path>`, then `git-flow pr`. If `git status --porcelain` prints anything, add that `multi-code-review` needs a clean tree, so the user has to commit the plan or ignore `.agents/plans/` first; a plan committed on the branch becomes part of the reviewed change set and of the PR. Do not edit the plan file beyond its `Status`, and do not move or delete it.
 
 ## Handling blockers
 

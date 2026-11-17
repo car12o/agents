@@ -29,6 +29,7 @@ Read the plan in full and check it against the plan-doc template yourself, befor
 - Sections 1–11 present in order, each with content or `Not applicable — <reason>`; section 5's three code subsections are optional.
 - Every step in section 6 has a `Verify` condition and a `Size` of XS, S, or M.
 - Every test in section 7 and every code-level item in section 8 (migrations, flags, rollback hooks) is scheduled by a step.
+- Section 3 has an Affected list whose every item cites a path and names the step in section 6, or the sibling plan, that handles it; or the list reads `None — <reason>`.
 - Every row in section 9 has Blocking `yes` or `no`, and Resolution is blank unless the question is resolved.
 
 A file without the plan-doc header is not a plan: stop and tell the user. Record every other miss, and every row with Blocking `yes` and a blank Resolution, as a finding of your own, in the format below, for Step 5 to categorize.
@@ -47,13 +48,14 @@ Read each plan first. The repository is checked out locally; read the files a pl
 
 The plans follow a fixed template. Do not report what it permits:
 
-- Header (Type, Slug, Date, Depends on) and eleven numbered sections: 1 Goal, 2 Context & Motivation, 3 Scope, 4 Dependencies & Risks, 5 Design, 6 Implementation Steps, 7 Testing Strategy, 8 Rollout & Migration, 9 Open Questions, 10 References, 11 Revision Log.
+- Header (Status, Type, Slug, Date, Depends on) and eleven numbered sections: 1 Goal, 2 Context & Motivation, 3 Scope, 4 Dependencies & Risks, 5 Design, 6 Implementation Steps, 7 Testing Strategy, 8 Rollout & Migration, 9 Open Questions, 10 References, 11 Revision Log.
 - A section may read `Not applicable — <reason>`; report it only if the reason is false.
 - Section 5's Interfaces & signatures, Transport / payload shapes, and Schema & query skeletons subsections are optional; code appears only there, as contracts or skeletons, never implementations.
 - Each step in section 6 is one independently reviewable change with a Verify condition and a Size: XS (<1 hr), S (<4 hr), M (<1 day); nothing larger. Every test in section 7 and every code-level item in section 8 belongs to the step that introduces the behaviour it covers.
+- Section 3's Affected list names the existing code, behaviour, integrations, data, and docs the change alters or makes stale, each with its path and the step, or the sibling plan, that handles it; or it reads `None — <reason>`.
 - A plan must be mergeable as one standalone PR. It must be split when it has more than 10 steps, spans more than two separately built, deployed, or owned components, or contains work that cannot start until another part has shipped. A split set shares one timestamp with a two-digit sequence; each plan names its prerequisites in Depends on and its siblings in References.
 - In section 9, Blocking is yes or no and Resolution stays blank until the question is resolved; implementation stops on Blocking yes with a blank Resolution.
-- Missing header fields, sections, Verify, Size, or Blocking values are already recorded; do not report them.
+- Missing header fields, sections, Verify, Size, or Blocking values, and a missing Affected list or an item without a path or handler, are already recorded; do not report them.
 
 Each finding must use this format exactly:
 
@@ -104,7 +106,7 @@ Check for: missing edge cases, no integration or rollback validation, untested a
 <findings>
 
 ## Scope
-Check for: fuzzy in/out-of-scope boundary, a split trigger met without a split, scope creep.
+Check for: fuzzy in/out-of-scope boundary, a split trigger met without a split, scope creep, anything the change alters or makes stale that the Affected list omits.
 
 <findings>
 
@@ -125,11 +127,11 @@ Launch the agents per `review-fanout`, then review the plans yourself while they
 
 ## Step 5 — Verify and categorize
 
-Verify and merge every finding per `review-fanout`. For this review, verification also means dropping findings that demand what the template permits. A finding that re-opens a decision recorded in a section 9 Resolution, a section 11 line after the initial draft, or the prompt's Context line is dropped unless it cites evidence the record does not mention; then it is decision required, never a clear decision.
+Verify and merge every finding per `review-fanout`. For this review, verification also means dropping findings that demand what the template permits. A finding that re-opens a decision recorded in a section 9 Resolution, a section 11 line after the initial draft, or the prompt's Context line is dropped unless it cites evidence the record does not mention; then it is decision required, never a clear decision. A finding that asks the plan to deliver a feature or goal beyond its Goal and success criteria is additional scope: it is never applied or put to the user as a decision, only listed in Step 8. Never additional scope: what the planned change needs to work correctly or safely, what the template's sections require, and existing code or docs the plan's own steps break or make stale.
 
-Categorize each surviving finding:
+Categorize each surviving finding that is not additional scope:
 
-- **Clear fix** — the plan text, the repository, or the template fully determines the edit: a test section 7 names with no step, a prerequisite in References but not in Depends on, a missing Size or Verify the step's content makes obvious, a duplicated or misplaced item, a Blocking question the plan or the repository answers (fill its Resolution).
+- **Clear fix** — the plan text, the repository, or the template fully determines the edit: a test section 7 names with no step, a prerequisite in References but not in Depends on, a missing Size or Verify the step's content makes obvious, a missing Affected list or an item's missing path or handler that the repository and the plan's steps determine, a duplicated or misplaced item, a Blocking question the plan or the repository answers (fill its Resolution).
 - **Clear decision** — the edit chooses between options, and the cited evidence makes one of them best: it delivers everything the other options named by the finding or the plan deliver, is no worse than any of them on every dimension they differ on (correctness, risk, effort, fit with the repository, or another), the evidence refutes any reason the plan gives for rejecting it, and you can state the reason in one sentence. A goal, success criterion, or scope boundary is clear only when the plan or the repository states the value. If you would hedge, it is decision required.
 - **Decision required** — every other choice: options that trade against each other (scope against effort, risk against speed, a design's simplicity against a capability it drops); a choice that needs information the plan and the repository lack, such as an owner, a due date, a business priority, or whether a risk is acceptable; a Blocking question neither the plan nor the repository answers; a goal or design replacement, or a split, even when the evidence favours it. A decision replaces the design when it abandons the approach section 5's Overview describes; changing one Key decisions row and the steps it touches is a patch.
 
@@ -151,6 +153,8 @@ Unless a decision replaces the goal or design or requires a split, carry each ap
 
 ## Step 8 — Report
 
+Write each plan's verdict, defined below, to its `Status` header as `ready` or `not ready`. Commit the plans git tracks (`git ls-files --error-unmatch <path>` exits 0) in a commit of their own per `git-conventions`; on `<default>` or a detached HEAD, leave them uncommitted. Then report:
+
 - Coverage, per `review-fanout`.
-- The Revision Log lines added, the clear decisions applied with their reasons, the clear decisions and fixes vetoed, and the findings discarded and why. Do not quote plan content otherwise.
+- The commit made, if any, the Revision Log lines added, the clear decisions applied with their reasons, the clear decisions and fixes vetoed, the additional-scope findings, one line each with Source, and the findings discarded and why. Do not quote plan content otherwise.
 - Verdict and next step. **Ready to execute** — header valid, every step has Verify and Size, no Blocking question lacks a Resolution, no decision replaces the goal or design or requires a split; next `plan-implement`. **Not ready** — anything else; name each unmet condition and its next step: the user, for an open Blocking question, a deferred decision, a vetoed fix that leaves a Ready condition unmet, or a change a sibling not under review needs; `plan-doc` with the decisions taken, for a goal or design replacement or a split.

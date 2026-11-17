@@ -42,3 +42,5 @@ Push per `git-conventions`. If `gh pr view` finds an open PR for the branch, rep
 
 1. Write the title, and write the body to `<file>`, per `git-conventions`, from `git log origin/<default>..HEAD`, `git diff origin/<default>...HEAD`, this session's record of the task and of the checks you saw run, and what the user reported. Read a plan only when the user passed one, and only for the problem, decisions, and rejected alternatives: a plan records intent, so the commits win where they disagree, and its `Verify` steps and Testing Strategy are not checks that ran.
 2. Open the PR with `gh pr create --base <default> --title … --body-file <file>`, adding `--attach` for each screenshot or recording per `git-conventions`, and report its URL.
+
+When the user passed a plan, set its `Status` header to `PR opened <url>`, whether `gh pr view` found the PR or item 2 opened it; if git tracks the plan (`git ls-files --error-unmatch <path>` exits 0), commit it in a commit of its own and push, per `git-conventions`.
